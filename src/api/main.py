@@ -3,6 +3,7 @@
 This module is intentionally minimal at scaffold time. The `fastapi-engineer`
 subagent owns expanding it. See `.claude/agents/fastapi-engineer.md`.
 """
+
 from __future__ import annotations
 
 import os

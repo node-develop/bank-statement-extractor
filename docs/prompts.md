@@ -16,3 +16,10 @@ Format per entry:
 ```
 
 Empty until the first iteration lands.
+
+## 2026-05-12 — classify_layout v1
+- Change: initial prompt for Haiku 4.5 layout classifier; decision rubric + 2 few-shot exemplars (ixonia_business_basic, generic_us_bank).
+- Why: M1 classifier node needs a versioned prompt; cache-friendly layout (stable instructions first, dynamic {chunk_text} placeholder last).
+- Eval before: n/a
+- Eval after: n/a (evals land in M2+ once extractors are wired)
+- Verdict: keep
