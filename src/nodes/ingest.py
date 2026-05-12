@@ -15,13 +15,11 @@ from __future__ import annotations
 
 import hashlib
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from src.api.logging import get_logger
+from src.graph.state import GraphState  # noqa: TC001 — runtime-required by LangGraph
 from src.models import RawStatement
-
-if TYPE_CHECKING:
-    from src.graph.state import GraphState
 
 logger = get_logger(__name__)
 

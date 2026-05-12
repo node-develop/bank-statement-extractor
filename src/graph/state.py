@@ -25,20 +25,47 @@ because only one node writes each of them.
 from __future__ import annotations
 
 import operator
-from typing import TYPE_CHECKING, Annotated, TypedDict
+from typing import Annotated, Any, NotRequired, TypedDict
 
-if TYPE_CHECKING:
-    from src.models import (
-        Account,
-        LayoutLabel,
-        PeriodChunk,
-        RawStatement,
-        Reconciliation,
-        Summary,
-        Transaction,
-    )
+# LangGraph's StateGraph calls `typing.get_type_hints()` on the TypedDict at
+# compile time, so the M0 models referenced in field annotations below must
+# be importable at runtime — not gated behind TYPE_CHECKING.
+from src.models import (  # noqa: TC001 — runtime-required by LangGraph TypedDict introspection
+    Account,
+    ExtractResult,
+    LayoutLabel,
+    PeriodChunk,
+    RawStatement,
+    Reconciliation,
+    Summary,
+    Transaction,
+)
+
+# Note on ``pending_hint``: the real runtime type is
+# ``src.nodes.critic_loop.CriticHint`` (a Pydantic BaseModel), but importing
+# it here would create a circular dependency (critic_loop imports GraphState).
+# We type it as ``Any`` and document the contract in the field docstring.
 
 __all__ = ["GraphState"]
+
+
+def _reduce_by_chunk_id(left: list[Any], right: list[Any]) -> list[Any]:
+    """Reducer for lists that may carry one entry per ``chunk_id``.
+
+    Default LangGraph reducer ``operator.add`` appends, which is correct for
+    fan-out where each branch contributes a unique ``chunk_id``.  But the
+    critic loop re-runs ``reconcile`` on retry passes, which would otherwise
+    cause the ``reconciliations`` list to accumulate duplicate entries for the
+    same ``chunk_id`` (rule 12 — silent structural duplication).
+
+    Semantics: last-write-wins by ``chunk_id``, preserving the order of first
+    appearance.  Used only for ``reconciliations`` in this milestone; M3 will
+    extend it to the extractor lists when extractor retries land.
+    """
+    merged: dict[str, Any] = {x.chunk_id: x for x in left}
+    for x in right:
+        merged[x.chunk_id] = x
+    return list(merged.values())
 
 
 class GraphState(TypedDict):
@@ -79,6 +106,15 @@ class GraphState(TypedDict):
     errors:
         Accumulated by any node that encounters a non-fatal problem (OCR
         disagreement, regex miss on period boundary, etc.).  Never cleared.
+    pending_hint:
+        Set by ``critic`` when it diagnoses a reconciliation failure.
+        Runtime type is ``src.nodes.critic_loop.CriticHint``; annotated as
+        ``Any`` here to avoid a circular import.  ``NotRequired`` — absent
+        until the first critic invocation.  Read by M3 retry-extractor
+        nodes (not yet wired in M2 R3).
+    final:
+        Populated by ``finalize`` as the last step.  ``NotRequired`` so that
+        all intermediate state snapshots remain valid before finalize runs.
     """
 
     pdf_path: str
@@ -89,6 +125,8 @@ class GraphState(TypedDict):
     accounts: Annotated[list[Account], operator.add]
     summaries: Annotated[list[Summary], operator.add]
     transactions: Annotated[list[Transaction], operator.add]
-    reconciliations: Annotated[list[Reconciliation], operator.add]
+    reconciliations: Annotated[list[Reconciliation], _reduce_by_chunk_id]
     retry_count: int
     errors: Annotated[list[str], operator.add]
+    pending_hint: NotRequired[Any]
+    final: NotRequired[ExtractResult]

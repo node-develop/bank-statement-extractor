@@ -23,3 +23,31 @@ Empty until the first iteration lands.
 - Eval before: n/a
 - Eval after: n/a (evals land in M2+ once extractors are wired)
 - Verdict: keep
+
+## 2026-05-12 — extract_account v1
+- Change: initial extractor prompt for Sonnet 4.6; field rules for bank name stripping, masked/bare account_last4, and ISO 8601 period dates; 2 few-shot exemplars (Ixonia masked form, generic masked form).
+- Why: M2 needs structured-output Account extraction per period chunk; masked `XXXXXX<last4>` form must strip to 4 digits, and the etalon asterisk (`4664*`) must not leak into the field.
+- Eval before: n/a
+- Eval after: n/a (graph wiring lands later in M2)
+- Verdict: keep
+
+## 2026-05-12 — extract_summary v1
+- Change: initial extractor prompt for Sonnet 4.6; Balance Summary block parsing rules, currency whitespace-collapse for OCR anomalies, negative-balance handling, count-from-parentheses rule; 1 few-shot exemplar (Ixonia Apr 2025).
+- Why: M2 needs structured-output Summary extraction; the `$509, 121.59` OCR artifact and negative beginning balances (Sep 2024 account 4623) are known edge cases that must be handled explicitly.
+- Eval before: n/a
+- Eval after: n/a (graph wiring lands later in M2)
+- Verdict: keep
+
+## 2026-05-12 — extract_transactions v1
+- Change: initial extractor prompt for Sonnet 4.6; running-balance-delta rule (verbatim from architecture.md invariant #1), pseudo-row exclusion, multi-line stitching, currency parsing, non-negative amount discipline; 3 few-shot exemplars (single-line credit, multi-line stitch, check-number debit).
+- Why: M2 needs structured-output list[Transaction] extraction; OCR column flattening makes direction assignment non-trivial — the delta rule is the only safe approach; exemplars cover the three Ixonia row shapes most likely to be mis-classified.
+- Eval before: n/a
+- Eval after: n/a (graph wiring lands later in M2)
+- Verdict: keep
+
+## 2026-05-12 — critic v1
+- Change: initial critic prompt for Haiku 4.5; reconciliation invariant, diagnostic priority order (count mismatch → delta-matches-row → balance-implausible → account-hint-mismatch), CriticHint output schema, 1 few-shot exemplar.
+- Why: M2 critic_loop node needs a structured hint to select which extractor of which chunk to re-run; priority ordering ensures the cheapest-to-fix cause is tried first, capping at 2 retries total.
+- Eval before: n/a
+- Eval after: n/a (graph wiring lands later in M2)
+- Verdict: keep
