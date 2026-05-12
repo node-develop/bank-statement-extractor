@@ -23,19 +23,59 @@ Sample expected summary for period #1 (Apr 2025, account 1664):
 
 ```json
 {
-  "account": {"bank": "Ixonia Bank", "account_last4": "4664",
+  "account": {"chunk_id": "period_01", "bank": "Ixonia Bank", "account_last4": "1664",
               "period": {"start": "2025-04-01", "end": "2025-04-30"}},
   "summary": {
-    "beginning_balance": 597068.70, "ending_balance": 509121.59,
-    "deposits_total": 1214254.05, "deposits_count": 81,
-    "withdrawals_total": 1302201.16, "withdrawals_count": 111
+    "chunk_id": "period_01",
+    "beginning_balance": "597068.70", "ending_balance": "509121.59",
+    "deposits_total": "1214254.05", "deposits_count": 81,
+    "withdrawals_total": "1302201.16", "withdrawals_count": 111
   }
 }
 ```
 
-Note: rows marked `*` in the Account column (May 2025, Nov 2024) signal an
-account-number-transition row in the source PDF — the layout classifier must
-not lose those periods.
+Note: `Account`, `Summary`, and `Transaction` all carry `chunk_id` as their first
+field so the reconciler can pair fan-out results by period without relying on list
+order.  API returns `Decimal` as a quoted JSON string to preserve precision; clients
+should parse monetary strings with a decimal library (e.g. Python `Decimal`, JS
+`decimal.js`).
+
+## Definitions
+
+- **`*` in the Account column.** The source PDF prints the account number
+  in its masked form `XXXXXX<last4>` instead of bare `<last4>`. Confirmed
+  in `Task/ixonia_binder2_ocr.txt` lines 1129 and 7588 (compare with the
+  raw form on line 35). The layout classifier must not drop these periods;
+  the `split_periods` deterministic node sets
+  `chunk.is_account_transition = True` when the OCR `Account Number:` line
+  starts with `XXXXXX`.
+
+## Known discrepancy — row 2 (May 2025)
+
+`Task/task.md` table writes the account for row 2 as `1664*`, but the
+OCR for that period shows `XXXXXX4664`. Two interpretations:
+1. Etalon-author transcribed the masked form `XXXXXX4664` as `1664*`
+   (typo — should be `4664*`).
+2. The masked digits in the source render ambiguously and the etalon
+   author chose `1664*`.
+
+Resolution policy (rule 7 — surface conflicts, don't average): when
+implementing `extract_account`, **trust the OCR** and emit
+`account_last4 = "4664"` for that period; if the eval scorer disagrees,
+file a `notes[]` entry and surface to the user. Do **not** silently
+patch `task.md` (Task/ is read-only).
+
+## Edge cases worth keeping in tests
+
+- **Period 7 (Sep 2024, account 4623)** — `Σdeposits == Σwithdrawals ==
+  $336,565.07`, net change of zero, and the source has `beginning ≈ -$4.00`
+  visible in the OCR. This is a legitimate zero-net statement, not a
+  parsing bug. Reconciler must still pass.
+- **OCR currency anomaly** — `$509, 121.59` (stray space) at line 1134
+  of `Task/ixonia_binder2_ocr.txt`. Currency parser must tolerate one or
+  more whitespace characters inside the number.
+
+## Invariant
 
 Reconciliation invariant for each period:
 `beginning + Σdeposits − Σwithdrawals = ending` ± ε ($0.01).
