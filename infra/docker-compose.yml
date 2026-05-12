@@ -1,0 +1,37 @@
+# Local dev / Dokploy-rendered compose.
+# Production secrets injected via Dokploy env mapping (see infra/dokploy.json).
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      LANGSMITH_API_KEY: ${LANGSMITH_API_KEY}
+      LANGSMITH_PROJECT: bank-statement-analizer-dev
+      LANGSMITH_TRACING: "true"
+      DATABASE_URL: postgresql://bsa:bsa@postgres:5432/bsa
+      FRONTEND_ORIGIN: http://localhost:5173
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: bsa
+      POSTGRES_PASSWORD: bsa
+      POSTGRES_DB: bsa
+    volumes:
+      - bsa_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bsa -d bsa"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  bsa_pgdata: {}

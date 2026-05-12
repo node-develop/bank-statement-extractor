@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# LangGraph checkpoint / runtime
+graph.sqlite
+graph.sqlite-*
+traces/
+src/evals/reports/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# IDE
+.idea/
+.vscode/
+
+# Secrets / local
+.env
+.env.*
+*.key
+*.pem
+CLAUDE.local.md
+.claude/settings.local.json
+
+# OS
+.DS_Store

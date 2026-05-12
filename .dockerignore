@@ -1,0 +1,17 @@
+.git
+.idea
+.vscode
+.venv
+.mypy_cache
+.ruff_cache
+.pytest_cache
+__pycache__
+*.py[cod]
+Task
+docs
+tests
+frontend/node_modules
+frontend/dist
+graph.sqlite*
+traces
+.env*

@@ -1,0 +1,20 @@
+{
+  "$schema": "https://dokploy.com/schemas/application/0.29.json",
+  "name": "bank-statement-analizer-api",
+  "applicationType": "dockerfile",
+  "dockerfilePath": "infra/Dockerfile",
+  "buildContext": ".",
+  "port": 8000,
+  "healthCheck": { "path": "/readyz", "interval": 30, "timeout": 5, "retries": 3 },
+  "livenessProbe": { "path": "/healthz" },
+  "env": {
+    "ANTHROPIC_API_KEY": "${secret:ANTHROPIC_API_KEY}",
+    "LANGSMITH_API_KEY": "${secret:LANGSMITH_API_KEY}",
+    "LANGSMITH_PROJECT": "bank-statement-analizer-prod",
+    "LANGSMITH_TRACING": "true",
+    "DATABASE_URL": "${service:postgres.url}",
+    "FRONTEND_ORIGIN": "${secret:FRONTEND_ORIGIN}"
+  },
+  "resources": { "memory": "1024Mi", "cpu": "500m" },
+  "notes": "Frontend is a separate Dokploy static-site app (build from frontend/dist)."
+}
