@@ -149,13 +149,22 @@ header appearing at these OCR line numbers (1-based):
 | 6 | 5297 | Sep 2024 | `4664` (raw)        |
 | 7 | 6280 | Sep 2024 | `4623` (raw, second account in same month) |
 | 8 | 6620 | Oct 2024 | `4664` (raw)        |
-| 9 | 7591 | Nov 2024 | `XXXXXX4664` (masked, etalon `4664*`) |
+| 9 | 7591 | Nov 2024 | *digits absent from OCR (lines 7587-7588 show `Account Number:` immediately followed by `Account Owner(s):`); etalon `4664*` — chunk emitted with `account_hint_last4=None` and a specific `errors[]` note (rule 7)* |
 | 10| 8632 | Dec 2024 | `4664` (raw)        |
 
-`tests/nodes/test_split_periods.py` must assert: (a) length 10, (b) each
-chunk's header line equals the table above, (c) `chunk.account_hint_last4`
-extracted from `^Account Number:\s*(?:XXXXXX)?(\d{4})$`, (d)
-`chunk.is_account_transition == ("XXXXXX" in raw_account_line)`.
+`tests/nodes/test_split_periods.py` must assert against the **M0 schema**
+in `src/models/__init__.py` (which differs from earlier drafts of this
+document — there is no `header_line` or `is_account_transition` field on
+`PeriodChunk`): (a) `len(chunks) == 10`, (b) `[c.chunk_id for c in chunks]
+== ["period_01", …, "period_10"]`, (c) `chunks[i].account_hint_last4`
+matches the column above for each `i` (and is `None` for row 9 due to the
+documented OCR omission), (d) the returned `errors[]` delta contains a
+specific note for row 9 referencing OCR line `7591` or month `11/2024`,
+(e) `chunks[0].ocr_slice.startswith("Beginning Balance as of 04/01/2025")`.
+Account-number lookback supports BOTH OCR variants seen in the fixture:
+single-line `^Account Number:\s*(?:XXXXXX)?(\d{4})\s*$` (e.g. line 1129)
+**and** two-line `Account Number:` then a following digit-only line
+`^(?:XXXXXX)?(\d{4})\s*$` within ≤3 lines (e.g. lines 34→35).
 
 ## Generalization strategy (rule 4, rule 7)
 
