@@ -1,0 +1,67 @@
+[project]
+name = "bank-statement-analizer"
+version = "0.1.0"
+description = "Agent service that extracts structured data from bank statements (LangGraph + LangChain + LangSmith + FastAPI)."
+requires-python = ">=3.14"
+readme = "README.md"
+license = { text = "MIT" }
+
+# NOTE: Python 3.14 is alpha as of 2026-05. CI/Docker should pin python:3.13-slim
+# until python:3.14-slim ships. See infra/Dockerfile header.
+dependencies = [
+  "fastapi>=0.136.1",
+  "uvicorn[standard]>=0.46.0",
+  "python-multipart>=0.0.17",
+  "pydantic>=2.9",
+  "pydantic-settings>=2.4",
+  # LangGraph / LangChain / LangSmith
+  "langgraph>=0.2.0",
+  "langgraph-checkpoint-sqlite>=2.0.0",
+  "langchain>=0.3.0",
+  "langchain-anthropic>=0.2.0",
+  "langsmith>=0.1.140",
+  # PDF
+  "pdfplumber>=0.11.0",
+  "pypdf>=5.0",
+  # Misc
+  "structlog>=24.4",
+  "httpx>=0.27",
+]
+
+[project.optional-dependencies]
+postgres = ["langgraph-checkpoint-postgres>=2.0.0", "psycopg[binary]>=3.2"]
+dev = [
+  "ruff>=0.6",
+  "mypy>=1.11",
+  "pytest>=8",
+  "pytest-asyncio>=0.24",
+  "respx>=0.21",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+extend-exclude = ["frontend", ".venv", "Task"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "N", "RUF", "S", "TCH"]
+ignore = ["S101"]  # allow assert in tests
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S"]
+
+[tool.mypy]
+strict = true
+python_version = "3.13"
+exclude = ["frontend", ".venv", "Task"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
