@@ -23,6 +23,13 @@ dependencies = [
   # PDF
   "pdfplumber>=0.11.0",
   "pypdf>=5.0",
+  # OCR fallback for image-based PDFs. Two engines, picked at runtime in
+  # src/nodes/ingest.py: Azure Document Intelligence (preferred when
+  # AZURE_DI_ENDPOINT + AZURE_DI_KEY env vars are set — high-quality digit
+  # recognition matches the Task/ixonia_binder2_ocr.txt baseline), with
+  # ocrmypdf/Tesseract as the self-hosted fallback when no key is present.
+  "ocrmypdf>=16.0",
+  "azure-ai-documentintelligence>=1.0.2",
   # Misc
   "structlog>=24.4",
 ]

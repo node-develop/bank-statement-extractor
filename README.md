@@ -80,6 +80,22 @@ For Dokploy 0.29: point a new application at this repo with build type
 Original brief: `Task/task.md`. Sample data: `Task/Binder2_Redacted.pdf`
 and `Task/ixonia_binder2_ocr.txt`. **Treat `Task/` as read-only.**
 
+## Known weaknesses
+
+- **OCR on image-based PDFs is slow.** Image-only scans (e.g.
+  `Task/Binder2_Redacted.pdf`, 99 pages, no embedded text) trigger a
+  server-side Tesseract pass via `ocrmypdf`. At ~3-5 s/page, the Ixonia
+  fixture takes ≈5 min on a cold container. Real evaluation statements
+  (1-3 periods, ≤30 pages) are well under 90 s. If quality or latency
+  matters, attach a pre-OCR'd `.txt` via the frontend's "Advanced"
+  override, or swap the engine to Azure Document Intelligence (not
+  currently wired).
+- **Tesseract OCR quality on noisy scans.** Tesseract is fine on the
+  clean Ixonia scan but can mis-read amounts on heavily-skewed or
+  low-DPI pages. Reconciliation will flag mismatches (rule 12 —
+  surface uncertainty, never silently average); the user can then
+  attach a higher-quality OCR text via the Advanced override.
+
 ## License
 
 MIT.

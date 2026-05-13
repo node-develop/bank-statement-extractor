@@ -170,8 +170,11 @@ def test_ingest_empty_page_surfaces_error(tmp_path: Path) -> None:
 
     ocr_text = "Some OCR content that is non-empty"
 
-    # Patch _extract_with_pdfplumber to return one empty page + one non-empty page
-    mock_pages = ["", "some content on page 2"]
+    # Patch _extract_with_pdfplumber to return one empty page + one dense page.
+    # Page 2 is intentionally long so the per-page average is above the OCR
+    # threshold (50 chars) — we want to exercise the empty-page flag, NOT the
+    # OCR fallback. Without this, ingest would invoke ocrmypdf on the blank PDF.
+    mock_pages = ["", "some content on page 2 " * 20]
 
     with patch("src.nodes.ingest._extract_with_pdfplumber", return_value=mock_pages):
         result = ingest(_make_state(str(pdf_path), None))
@@ -187,4 +190,123 @@ def test_ingest_empty_page_surfaces_error(tmp_path: Path) -> None:
 
     assert any("page 1" in e or "empty" in e.lower() for e in result2["errors"]), (
         f"Expected an error mentioning 'page 1' or 'empty', got errors={result2['errors']}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Test 7 — OCR fallback engages on image-based PDF when no .txt supplied
+# ---------------------------------------------------------------------------
+
+
+def test_ingest_ocr_fallback_engages(tmp_path: Path) -> None:
+    """Image-based PDF without .txt companion → ocrmypdf runs server-side.
+
+    Asserts the business intent from task.md: txt_path is optional, and the
+    service must handle scanned bank statements end-to-end (rule 4).
+    """
+    from src.nodes.ingest import ingest
+
+    pdf_path = tmp_path / "scan.pdf"
+    pdf_path.write_bytes(_minimal_pdf_bytes())
+
+    fake_pages = ["page one OCR text", "page two OCR text"]
+    fake_full = "page one OCR text\fpage two OCR text"
+
+    with (
+        patch("src.nodes.ingest._extract_with_pdfplumber", return_value=["", ""]),
+        patch(
+            "src.nodes.ingest._run_tesseract_ocr",
+            return_value=(fake_pages, fake_full),
+        ),
+    ):
+        result = ingest(_make_state(str(pdf_path), None))
+
+    assert result["raw"].ocr_text == fake_full, "OCR sidecar text must reach raw.ocr_text"
+    assert result["raw"].pages == fake_pages, "OCR pages must replace empty pdfplumber pages"
+    # OCR engagement is informational — goes to notes[], not errors[].
+    assert result["errors"] == [], f"OCR success must not write to errors[]; got {result['errors']}"
+    assert any("OCR fallback engaged" in n for n in result["notes"]), (
+        f"Expected notes[] to record OCR ran; got {result['notes']}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Test 8 — OCR fallback skipped when extracted text is dense
+# ---------------------------------------------------------------------------
+
+
+def test_ingest_ocr_fallback_skipped_on_dense_text(tmp_path: Path) -> None:
+    """A PDF with a real text layer should NOT invoke ocrmypdf (rule 2 — simplicity)."""
+    from src.nodes.ingest import ingest
+
+    pdf_path = tmp_path / "dense.pdf"
+    pdf_path.write_bytes(_minimal_pdf_bytes())
+
+    dense_pages = ["a" * 500, "b" * 500]  # avg = 500 chars/page, well above 50
+
+    with (
+        patch("src.nodes.ingest._extract_with_pdfplumber", return_value=dense_pages),
+        patch("src.nodes.ingest._run_tesseract_ocr") as ocr_mock,
+    ):
+        result = ingest(_make_state(str(pdf_path), None))
+
+    ocr_mock.assert_not_called()
+    assert result["raw"].ocr_text is None, "ocr_text should remain None on dense text"
+    assert result["raw"].pages == dense_pages, "dense pages must pass through unchanged"
+
+
+# ---------------------------------------------------------------------------
+# Test 9 — Caller-supplied .txt overrides server-side OCR
+# ---------------------------------------------------------------------------
+
+
+def test_ingest_ocr_fallback_skipped_with_companion_txt(tmp_path: Path) -> None:
+    """If the user attaches their own OCR text, do NOT run Tesseract.
+
+    Honors the "Advanced: attach .txt" override on the frontend — when present,
+    the caller knows better (rule 7 — surface conflicts, don't average).
+    """
+    from src.nodes.ingest import ingest
+
+    pdf_path = tmp_path / "scan.pdf"
+    pdf_path.write_bytes(_minimal_pdf_bytes())
+    ocr_path = tmp_path / "manual.txt"
+    ocr_path.write_text("manually attached OCR text", encoding="utf-8")
+
+    with (
+        patch("src.nodes.ingest._extract_with_pdfplumber", return_value=["", ""]),
+        patch("src.nodes.ingest._run_tesseract_ocr") as ocr_mock,
+    ):
+        result = ingest(_make_state(str(pdf_path), str(ocr_path)))
+
+    ocr_mock.assert_not_called()
+    assert result["raw"].ocr_text == "manually attached OCR text"
+
+
+# ---------------------------------------------------------------------------
+# Test 10 — OCR fallback failure is reported via errors[], no crash
+# ---------------------------------------------------------------------------
+
+
+def test_ingest_ocr_fallback_failure_reported(tmp_path: Path) -> None:
+    """When ocrmypdf fails (missing binary, corrupt PDF, etc.), ingest must NOT
+    crash — the failure is surfaced via errors[] so the user sees what happened
+    (rule 12 — fail loud, no silent gaps)."""
+    from src.nodes.ingest import OcrFallbackError, ingest
+
+    pdf_path = tmp_path / "scan.pdf"
+    pdf_path.write_bytes(_minimal_pdf_bytes())
+
+    with (
+        patch("src.nodes.ingest._extract_with_pdfplumber", return_value=["", ""]),
+        patch(
+            "src.nodes.ingest._run_tesseract_ocr",
+            side_effect=OcrFallbackError("simulated tesseract binary missing"),
+        ),
+    ):
+        result = ingest(_make_state(str(pdf_path), None))
+
+    assert result["raw"].ocr_text is None, "ocr_text remains None when OCR fails"
+    assert any("OCR fallback failed" in e for e in result["errors"]), (
+        f"Expected errors[] to flag OCR failure; got {result['errors']}"
     )

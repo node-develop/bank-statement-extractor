@@ -23,9 +23,24 @@ logger = get_logger(__name__)
 # Compiled regexes (module-level, compile once)
 # ---------------------------------------------------------------------------
 
-# Primary period anchors
-_BEG = re.compile(r"^Beginning Balance as of (\d{2})/(\d{2})/(\d{4})\s*$")
-_END = re.compile(r"^Ending Balance as of (\d{2})/(\d{2})/(\d{4})\s*$")
+# Primary period anchors.
+# OCR engines disagree on column layout. Three real-world shapes seen so far:
+#   (a) Azure DI stream  — "...as of 04/01/2025"            (year is line-end)
+#   (b) Tesseract stream — "...as of 04/01/2025 $597,068.70" (amount appended)
+#   (c) Azure DI table   — "...as of 05/01/2025 | $509, 121.59"  (pipe-delimited)
+# We want to match (a) and (b) once per period, but NOT (c) — it's the same
+# period repeated in a structured-table recap section, and counting it
+# produces duplicate chunks. The negative lookahead `(?!\s*\|)` excludes (c).
+# \s+ between tokens absorbs Tesseract's stray double-spaces; \d{1,2} allows
+# OCR-dropped leading zeros; IGNORECASE handles "BEGINNING BALANCE".
+_BEG = re.compile(
+    r"^Beginning\s+Balance\s+as\s+of\s+(\d{1,2})/(\d{1,2})/(\d{4})\b(?!\s*\|)",
+    re.IGNORECASE,
+)
+_END = re.compile(
+    r"^Ending\s+Balance\s+as\s+of\s+(\d{1,2})/(\d{1,2})/(\d{4})\b(?!\s*\|)",
+    re.IGNORECASE,
+)
 
 # Account-number patterns
 # Single-line form: "Account Number: XXXXXX4664" or "Account Number: 4664"
@@ -47,13 +62,16 @@ _LOOKBACK = 20  # max lines before Beginning anchor to scan for account number
 def split_periods(state: GraphState) -> dict[str, Any]:
     """Split ``raw.ocr_text`` into one ``PeriodChunk`` per detected period.
 
-    Returns a partial state delta with keys ``"period_chunks"`` and
-    ``"errors"``.  Never calls an LLM — on regex miss the function logs a
-    specific error and returns whatever complete chunks it could build.
+    Returns a partial state delta with keys ``"period_chunks"``, ``"errors"``
+    (real failures), and ``"notes"`` (informational — e.g. the cheap regex
+    couldn't infer account_last4, but ``extract_account`` will still try via
+    LLM). Never calls an LLM — on regex miss the function logs a specific
+    note and returns whatever complete chunks it could build.
     """
     raw = state["raw"]
     ocr_text: str | None = raw.ocr_text
     errors: list[str] = []
+    notes: list[str] = []
 
     # OCR is optional. When the caller did not supply a .txt companion (or
     # supplied an empty one), fall back to the pdfplumber-extracted per-page
@@ -74,15 +92,22 @@ def split_periods(state: GraphState) -> dict[str, Any]:
             # channel when the fallback completes successfully.
             ocr_text = joined_pages
         else:
+            # The ingest node already attempted Tesseract OCR before we got
+            # here (see src/nodes/ingest.py:_run_tesseract_ocr). If we still
+            # have no text, OCR genuinely produced nothing — either the PDF
+            # is blank, severely corrupted, or Tesseract failed to install.
+            # Report the catastrophe; do NOT instruct the user to "attach"
+            # anything (the API contract is one file = the PDF).
             logger.warning(
-                "split_periods: raw.ocr_text empty AND pdfplumber pages have 0 chars "
-                "(image-based PDF)"
+                "split_periods: no text available after pdfplumber, pypdf, and OCR fallback "
+                "(see errors[] for engine details)"
             )
             return {
                 "period_chunks": [],
                 "errors": [
-                    "This PDF appears to be image-based (scanned, no embedded text). "
-                    "Upload an OCR-text companion (.txt) via the 'attach' link."
+                    "split_periods: no text extracted from this PDF — "
+                    "pdfplumber, pypdf, and the OCR fallback all produced empty output. "
+                    "The document may be blank, password-protected, or corrupted."
                 ],
             }
 
@@ -105,7 +130,9 @@ def split_periods(state: GraphState) -> dict[str, Any]:
 
     if len(beg_matches) != len(end_matches):
         n_beg, n_end = len(beg_matches), len(end_matches)
-        errors.append(
+        # Informational — we still build min(n_beg, n_end) chunks, so this is
+        # a partial-success notice, not a hard error.
+        notes.append(
             f"split_periods: found {n_beg} Beginning anchors but "
             f"{n_end} Ending anchors; building {min(n_beg, n_end)} chunks"
         )
@@ -133,7 +160,7 @@ def split_periods(state: GraphState) -> dict[str, Any]:
                 account_hint_last4=whole_doc_hint,
             )
         ]
-        return {"period_chunks": chunks, "errors": errors}
+        return {"period_chunks": chunks, "errors": errors, "notes": notes}
 
     chunks = []
 
@@ -159,9 +186,11 @@ def split_periods(state: GraphState) -> dict[str, Any]:
         ocr_slice = "\n".join(lines[beg_idx:slice_end])
 
         # ------------------------------------------------------------------
-        # Account-number lookback
+        # Account-number lookback. Misses go into notes[], not errors[], because
+        # the LLM-based extract_account node will still try independently — the
+        # regex hint is informational, not a contract.
         # ------------------------------------------------------------------
-        account_hint_last4 = _find_account_hint(lines, beg_idx, mm_beg, yyyy_beg, errors)
+        account_hint_last4 = _find_account_hint(lines, beg_idx, mm_beg, yyyy_beg, notes)
 
         # ------------------------------------------------------------------
         # Page-range alignment (best-effort, raw.pages may be empty)
@@ -185,7 +214,7 @@ def split_periods(state: GraphState) -> dict[str, Any]:
         )
 
     logger.info("split_periods: built %d chunks from %d lines", len(chunks), len(lines))
-    return {"period_chunks": chunks, "errors": errors}
+    return {"period_chunks": chunks, "errors": errors, "notes": notes}
 
 
 def _find_account_hint(
@@ -193,7 +222,7 @@ def _find_account_hint(
     beg_idx: int,
     mm: str,
     yyyy: str,
-    errors: list[str],
+    notes: list[str],
 ) -> str | None:
     """Look back up to ``_LOOKBACK`` lines before *beg_idx* for an account number.
 
@@ -202,8 +231,9 @@ def _find_account_hint(
     2. Two-line: a line that is exactly ``Account Number:`` followed by a line
        containing ``[XXXXXX]<4 digits>`` within the next 3 lines.
 
-    Returns the 4-digit string on match, ``None`` on miss.  Appends a
-    diagnostic to *errors* on miss.
+    Returns the 4-digit string on match, ``None`` on miss.  Appends an
+    informational note to *notes* on miss — the LLM-based ``extract_account``
+    node still tries independently, so a regex miss is NOT a real error.
     """
     start = max(0, beg_idx - _LOOKBACK)
     window = lines[start:beg_idx]
@@ -223,10 +253,10 @@ def _find_account_hint(
                 if m:
                     return m.group(1)
 
-    # Neither pattern matched
-    errors.append(
-        f"split_periods: account_last4 not found within {_LOOKBACK} lines "
-        f"before line {beg_idx + 1} (period {mm}/{yyyy})"
+    # Neither pattern matched — informational, the LLM extractor will retry.
+    notes.append(
+        f"split_periods: account hint not found by regex within {_LOOKBACK} lines "
+        f"before line {beg_idx + 1} (period {mm}/{yyyy}); extract_account LLM will try."
     )
     return None
 

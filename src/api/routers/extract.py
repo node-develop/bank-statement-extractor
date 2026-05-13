@@ -193,6 +193,7 @@ async def extract(
         "verifier_reports": [],
         "retry_count": 0,
         "errors": [],
+        "notes": [],
         # Phase 3 — cumulative LLM cost (operator.add reducer in GraphState).
         # Must be initialised here or the first node addition raises.
         "cumulative_cost_usd": Decimal("0"),
@@ -264,11 +265,14 @@ async def extract(
         )
         raw_errors = result_state.get("errors", [])
         errors_list: list[str] = list(raw_errors) if isinstance(raw_errors, list) else []
+        raw_notes = result_state.get("notes", [])
+        notes_list: list[str] = list(raw_notes) if isinstance(raw_notes, list) else []
         partial_periods = _build_partial_periods_on_pause(result_state)
         return ExtractResult(
             periods=partial_periods,
             statement_sha256=digest,
             errors=errors_list,
+            notes=notes_list,
             pending_review=PendingReview(
                 extraction_id=extraction_id,
                 reason=reason,

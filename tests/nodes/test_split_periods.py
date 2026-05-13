@@ -148,11 +148,15 @@ def test_ixonia_nov_2024_account_missing(ixonia_result: dict[str, Any]) -> None:
     not _IXONIA_OCR.exists(),
     reason="Task/ixonia_binder2_ocr.txt not present in this environment",
 )
-def test_ixonia_nov_2024_error_surfaced(ixonia_result: dict[str, Any]) -> None:
-    """An error referencing the Nov 2024 lookback miss must be in errors[]."""
-    errors = ixonia_result["errors"]
-    assert any("7591" in e or "11/2024" in e for e in errors), (
-        f"Expected error mentioning '7591' or '11/2024', got errors={errors}"
+def test_ixonia_nov_2024_note_surfaced(ixonia_result: dict[str, Any]) -> None:
+    """A note referencing the Nov 2024 lookback miss must be in notes[].
+
+    Account-hint regex misses are informational (extract_account LLM will
+    retry), so they live in notes[], not errors[].
+    """
+    notes = ixonia_result.get("notes", [])
+    assert any("7591" in n or "11/2024" in n for n in notes), (
+        f"Expected a note mentioning '7591' or '11/2024', got notes={notes}"
     )
 
 
@@ -194,7 +198,7 @@ def test_split_periods_single_line_account() -> None:
 
 
 def test_split_periods_two_line_account() -> None:
-    """Two-line 'Account Number:\\n1664' form is found via the lookback."""
+    """Two-line 'Account Number:\n1664' form is found via the lookback."""
     from src.nodes.split_periods import split_periods
 
     ocr = (
@@ -213,15 +217,21 @@ def test_split_periods_two_line_account() -> None:
     assert chunks[0].account_hint_last4 == "1664"
 
 
-def test_split_periods_image_based_pdf_emits_actionable_error() -> None:
-    """Image-based PDF (pdfplumber returns 0 chars) gets a user-facing error."""
+def test_split_periods_no_text_anywhere_emits_actionable_error() -> None:
+    """Truly empty input (image-based PDF + OCR fallback also failed) → user-facing error.
+
+    The ingest node is now responsible for attempting Tesseract OCR; by the
+    time split_periods sees an empty raw, every upstream extractor has already
+    failed (pdfplumber, pypdf, AND ocrmypdf). The error message must reflect
+    that complete failure, NOT the old "attach a .txt" workaround.
+    """
     from src.nodes.split_periods import split_periods
 
     # _make_state default `pages=[""]` simulates pdfplumber returning nothing.
     result = split_periods(_make_state(None))
     assert result["period_chunks"] == []
-    assert any("image-based" in e for e in result["errors"]), (
-        f"Expected 'image-based' error, got {result['errors']}"
+    assert any("no text extracted" in e.lower() for e in result["errors"]), (
+        f"Expected 'no text extracted' error, got {result['errors']}"
     )
 
 
@@ -231,7 +241,7 @@ def test_split_periods_empty_ocr_text_and_no_pages_returns_empty() -> None:
 
     result = split_periods(_make_state("   \n  "))
     assert result["period_chunks"] == []
-    assert any("image-based" in e for e in result["errors"])
+    assert any("no text extracted" in e.lower() for e in result["errors"])
 
 
 def test_split_periods_falls_back_to_pdfplumber_pages_when_no_ocr() -> None:
@@ -278,3 +288,59 @@ def test_split_periods_ocr_slice_spans_beg_to_end() -> None:
     assert "mid-period transaction line" in chunks[0].ocr_slice
     assert "Ending Balance as of 01/31/2025" in chunks[0].ocr_slice
     assert chunks[0].ocr_slice.rstrip().endswith("$450.00")
+
+
+def test_split_periods_tesseract_inline_amount() -> None:
+    """Tesseract appends the dollar amount to the anchor line on a single line.
+
+    Azure DI puts the amount on the next line; Tesseract concatenates it after
+    the year. Regex must match BOTH shapes (rule 4 — generalise to unseen banks).
+    """
+    from src.nodes.split_periods import split_periods
+
+    ocr = (
+        "Account Number: 1664\n"
+        "Beginning Balance as of 04/01/2025 $597,068.70\n"
+        "Apr 01 SOME TXN 100.00 597,168.70\n"
+        "Ending Balance as of 04/30/2025 $509,121.59.\n"
+    )
+    result = split_periods(_make_state(ocr))
+    chunks = result["period_chunks"]
+    assert len(chunks) == 1, f"expected 1 chunk, got {len(chunks)}: errors={result['errors']}"
+    assert chunks[0].account_hint_last4 == "1664"
+
+
+def test_split_periods_excludes_table_recap_lines() -> None:
+    """Azure DI repeats Beginning Balance anchors in a pipe-delimited table recap.
+
+    The recap form ("...as of 05/01/2025 | $509, 121.59") refers to the SAME
+    period as the earlier stream form and must NOT produce a duplicate chunk.
+    """
+    from src.nodes.split_periods import split_periods
+
+    ocr = (
+        "Account Number: 1664\n"
+        "Beginning Balance as of 04/01/2025\n"
+        "$597,068.70\n"
+        "Ending Balance as of 04/30/2025\n"
+        "$509,121.59\n"
+        "Table recap:\n"
+        "Beginning Balance as of 04/01/2025 | $597,068.70\n"
+        "Ending Balance as of 04/30/2025 | $509,121.59\n"
+    )
+    result = split_periods(_make_state(ocr))
+    chunks = result["period_chunks"]
+    assert len(chunks) == 1, f"expected 1 chunk, table recap got counted: {len(chunks)}"
+
+
+def test_split_periods_caseinsensitive_anchor() -> None:
+    """Some OCR runs uppercase the entire balance summary header."""
+    from src.nodes.split_periods import split_periods
+
+    ocr = (
+        "Account Number: 1234\n"
+        "BEGINNING BALANCE AS OF 06/01/2024 $100.00\n"
+        "ENDING BALANCE AS OF 06/30/2024 $200.00\n"
+    )
+    result = split_periods(_make_state(ocr))
+    assert len(result["period_chunks"]) == 1

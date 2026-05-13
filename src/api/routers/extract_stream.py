@@ -141,6 +141,7 @@ async def extract_stream(
         "verifier_reports": [],
         "retry_count": 0,
         "errors": [],
+        "notes": [],
         # Phase 3 — cumulative LLM cost (operator.add reducer in GraphState).
         # Must be initialised here or the first node addition raises.
         "cumulative_cost_usd": Decimal("0"),

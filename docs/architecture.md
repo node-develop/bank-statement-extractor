@@ -65,6 +65,19 @@ via `BSA_COST_CAP_USD`), `route_after_verifier` short-circuits to
   extractors**: PDF-extracted text is primary; OCR text is only consulted for
   pages where pdfplumber returned empty/garbage. Any disagreement between
   sources on a non-empty page is appended to `errors[]` (rule 7).
+  **Server-side OCR fallback** — when the user did NOT supply a `txt_path`
+  companion AND the pdfplumber+pypdf output averages below 50 chars/page
+  (`_OCR_AVG_CHARS_PER_PAGE` in `src/nodes/ingest.py`), the document is
+  treated as image-based and `ocrmypdf` is invoked with `force_ocr=True`,
+  `language=["eng"]`, `output_type="none"` (sidecar text only). The sidecar
+  text replaces `raw.ocr_text` and is also split on `\f` to repopulate
+  `raw.pages` so the downstream page-range lookup in `split_periods` still
+  works. The engine choice is surfaced as a non-fatal note in `errors[]`
+  (`"ingest: OCR fallback engaged engine=tesseract pages=N chars=M"`) per
+  rule 12 — fail loud / mark uncertainty. If the user supplies `txt_path`,
+  it overrides the OCR fallback entirely (rule 7 — caller knows best).
+  Requires `tesseract-ocr`, `poppler-utils`, `ghostscript`, and `unpaper`
+  system packages (installed in `infra/Dockerfile`).
 - `split_periods` — **deterministic Python**, no LLM. Regex anchors:
   `Statement Period`, `Beginning Balance`, `Ending Balance`, plus account-
   number changes within the same calendar month (Ixonia Sep 2024 has both

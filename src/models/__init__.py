@@ -456,5 +456,13 @@ class ExtractResult(BaseModel):
     periods: list[PeriodResult]
     statement_sha256: str
     langsmith_run_url: str | None = None
+    # errors[]: actual problems the user needs to know about — extraction
+    # failures, mismatches, corrupt input. Rendered in a danger/warning block.
     errors: list[str] = Field(default_factory=list)
+    # notes[]: informational pipeline notices — which OCR engine ran, why a
+    # critic loop kicked off, etc. Per rule 12 ("surface uncertainty"), these
+    # belong in the response but they're NOT errors. Rendered separately
+    # (info block) on the frontend so the user can distinguish "we did
+    # something noteworthy" from "something went wrong".
+    notes: list[str] = Field(default_factory=list)
     pending_review: PendingReview | None = None  # Phase 2 — None on the happy path

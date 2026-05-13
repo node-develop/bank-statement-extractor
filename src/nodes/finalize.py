@@ -47,6 +47,7 @@ def finalize(state: GraphState) -> dict[str, Any]:
     transactions = state.get("transactions", [])
     verifier_reports = state.get("verifier_reports", [])
     errors = list(state.get("errors", []))
+    notes = list(state.get("notes", []))
 
     # Index per-chunk results by chunk_id for O(1) lookup.
     account_by_id = {a.chunk_id: a for a in accounts}
@@ -98,6 +99,7 @@ def finalize(state: GraphState) -> dict[str, Any]:
         statement_sha256=state["raw"].sha256,
         langsmith_run_url=None,
         errors=errors,
+        notes=notes,
     )
 
     logger.info(

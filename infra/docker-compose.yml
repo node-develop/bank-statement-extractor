@@ -35,10 +35,17 @@ services:
       # Anthropic — required; supply via .env or shell (never commit secrets).
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
 
-      # HITL threshold override (default 3). Set to 0 to force any non-clean
-      # extraction into await_review so the review modal is reachable on
-      # small fixtures during testing.
-      BSA_AWAIT_REVIEW_SUSPECTS: ${BSA_AWAIT_REVIEW_SUSPECTS:-3}
+      # Azure Document Intelligence (preferred OCR engine — Tesseract fallback
+      # when these are absent). See src/nodes/ingest.py:_pick_ocr_engine.
+      AZURE_DI_ENDPOINT: ${AZURE_DI_ENDPOINT:-}
+      AZURE_DI_KEY: ${AZURE_DI_KEY:-}
+
+      # HITL threshold override. Set higher so the critic loop gets a chance
+      # to re-extract problematic chunks before bailing to HITL (Binder2
+      # produces ~17 suspects on first pass; default 3 skipped critic entirely).
+      # Set to 0 to force any non-clean extraction into await_review for
+      # testing the review modal flow.
+      BSA_AWAIT_REVIEW_SUSPECTS: ${BSA_AWAIT_REVIEW_SUSPECTS:-25}
 
       # LangSmith — optional tracing; defaults to off.
       LANGSMITH_API_KEY: ${LANGSMITH_API_KEY:-}

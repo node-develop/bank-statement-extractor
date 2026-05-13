@@ -309,6 +309,7 @@ def run_extract(pdf_path: str, txt_path: str | None = None) -> ExtractResult:
             "verifier_reports": [],
             "retry_count": 0,
             "errors": [],
+            "notes": [],
             "cumulative_cost_usd": Decimal("0"),
         }
         config: dict[str, Any] = {

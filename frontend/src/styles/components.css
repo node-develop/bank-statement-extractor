@@ -330,6 +330,47 @@ body,
     transform: translateX(120%);
   }
 }
+/* When a lane is running but its fill width is ~0 (no progress signal yet —
+ * common for LLM-bound nodes like extract_transactions on long jobs), the
+ * `sweep` overlay above has nothing to ride on. The surface-2/3 shimmer was
+ * imperceptible (~2% luminance delta), so we drop it and instead pulse the
+ * lane-name text so the user can see the lane is actively working. */
+.lane-bar:has(.lane-fill.running) {
+  animation: none;
+}
+/* Opacity pulse on the lane name when the step is running */
+.lane-name.running {
+  animation: lane-name-pulse 1.2s ease-in-out infinite;
+}
+@keyframes lane-name-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+/* Animated typing dots appended after the "running" status text.
+ * We fix content to "..." and clip the width with steps() so it
+ * reads as 0→1→2→3 dots — works in all evergreen browsers without
+ * relying on animating the `content` property. */
+.lane-status.running::after {
+  content: "...";
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: bottom;
+  width: 0;
+  animation: typing-dots 1.2s steps(4, end) infinite;
+}
+@keyframes typing-dots {
+  0% {
+    width: 0;
+  }
+  100% {
+    width: 1.6em;
+  }
+}
 .lane-time,
 .lane-status {
   font-family: var(--font-mono);
@@ -386,10 +427,13 @@ body,
   color: #fff;
   border-color: var(--success-fg);
 }
+/* "danger" means the verifier flagged suspects on this period — needs review,
+ * NOT a hard failure. Use the warning palette (amber) instead of the hard
+ * red danger color, so the chip reads as "attention" rather than "broken". */
 .period-chip.danger {
-  background: var(--danger-fg);
-  color: #fff;
-  border-color: var(--danger-fg);
+  background: var(--warning-bg);
+  color: var(--warning-fg);
+  border-color: var(--warning-border);
 }
 .period-chip .dot {
   width: 6px;

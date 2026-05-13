@@ -196,12 +196,14 @@ def critic(state: GraphState) -> dict[str, Any]:
 
     try:
         hint, this_call_cost = _invoke_critic_llm(state, target_report)
-        hint_str = f"critic suggested: rerun {hint.extractor} on {hint.chunk_id} -- {hint.hint}"
+        hint_str = f"Critic re-ran {hint.extractor} on {hint.chunk_id}: {hint.hint}"
         logger.info("critic: %s", hint_str)
+        # The critic's diagnostic is INFORMATIONAL — it tells the user that
+        # a retry happened and why. Goes to notes[], not errors[].
         return {
             "retry_count": current_retry + 1,
             "pending_hint": hint,
-            "errors": [hint_str],
+            "notes": [hint_str],
             "cumulative_cost_usd": this_call_cost,
         }
     except _RECOVERABLE as exc:

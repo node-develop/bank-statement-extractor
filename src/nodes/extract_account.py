@@ -40,6 +40,10 @@ _LLM_INSTANCE: Any = None
 # Account / summary headers live in the first portion of the chunk text;
 # truncate to keep token usage bounded.
 _MAX_INPUT_CHARS = 6_000
+# Smart-slice constants — see extract_summary.py for full rationale. Same
+# values so behaviour is consistent across the two extractor nodes.
+_SMART_SLICE_LINES = 120
+_SMART_SLICE_PRE = 5
 
 
 def _get_llm() -> Any:
@@ -73,14 +77,14 @@ def extract_account(chunk: PeriodChunk) -> dict[str, Any]:
     """
     # Prefer pdf_text; fall back to ocr_slice when pdf_text is empty.
     raw_text: str = chunk.pdf_text if chunk.pdf_text else (chunk.ocr_slice or "")
+    text = _smart_slice_around_summary(raw_text)
     if len(raw_text) > _MAX_INPUT_CHARS:
         logger.warning(
-            "extract_account: chunk %s text is %d chars, truncating to %d",
+            "extract_account: chunk %s text is %d chars, smart-sliced to %d",
             chunk.chunk_id,
             len(raw_text),
-            _MAX_INPUT_CHARS,
+            len(text),
         )
-    text = raw_text[:_MAX_INPUT_CHARS]
 
     try:
         return _invoke_llm(chunk, text)
@@ -98,6 +102,32 @@ def extract_account(chunk: PeriodChunk) -> dict[str, Any]:
         )
         logger.warning(error_msg)
         return {"accounts": [placeholder], "errors": [error_msg]}
+
+
+def _smart_slice_around_summary(raw_text: str) -> str:
+    """Slice the chunk text around the period's Beginning Balance anchor.
+
+    Same strategy as ``extract_summary._smart_slice_around_summary`` — see
+    that function's docstring for the full rationale. Duplicated rather than
+    imported to keep the two extractor nodes independent.
+    """
+    if len(raw_text) <= _MAX_INPUT_CHARS:
+        return raw_text
+
+    lines = raw_text.split("\n")
+    anchor_idx: int | None = None
+    for i, line in enumerate(lines):
+        if "Beginning Balance" in line:
+            anchor_idx = i
+            break
+
+    if anchor_idx is None:
+        return raw_text[:_MAX_INPUT_CHARS]
+
+    start = max(0, anchor_idx - _SMART_SLICE_PRE)
+    end = min(len(lines), anchor_idx + _SMART_SLICE_LINES)
+    sliced = "\n".join(lines[start:end])
+    return sliced[:_MAX_INPUT_CHARS]
 
 
 def _invoke_llm(chunk: PeriodChunk, text: str) -> dict[str, Any]:

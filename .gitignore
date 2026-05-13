@@ -34,3 +34,6 @@ CLAUDE.local.md
 
 # OS
 .DS_Store
+
+# Task/ source PDFs are read-only; never commit (CLAUDE.md).
+Task/*.pdf
