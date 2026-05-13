@@ -401,3 +401,55 @@ def test_ixonia_page_ranges_non_overlapping_and_cover_all_pages() -> None:
         f"Sum of page-range spans {sum(spans)} < total_pages {total_pages} - 2; "
         f"some pages are not covered by any chunk"
     )
+
+
+def test_resolve_period_pages_uses_next_anchor() -> None:
+    """_resolve_period_pages: each chunk extends up to next period's first page - 1."""
+    from src.nodes.split_periods import _resolve_period_pages
+
+    pages = [
+        "cover page",  # 1
+        "Beginning Balance as of 04/01/2025\nstuff",  # 2
+        "more apr tx",  # 3
+        "more apr tx page 3",  # 4
+        "Beginning Balance as of 05/01/2025\nstuff",  # 5
+        "may tx page 2",  # 6
+        "may tx page 3",  # 7
+    ]
+    beg_anchors = [
+        "Beginning Balance as of 04/01/2025",
+        "Beginning Balance as of 05/01/2025",
+    ]
+    ranges = _resolve_period_pages(pages, beg_anchors)
+    assert ranges == [(2, 4), (5, 7)]
+
+
+def test_resolve_period_pages_missing_anchor_falls_back_to_previous_last_plus_one() -> None:
+    """When an anchor is not in any page, fall back to previous chunk's last+1."""
+    from src.nodes.split_periods import _resolve_period_pages
+
+    pages = [
+        "Beginning Balance as of 04/01/2025\nstuff",  # 1
+        "apr tx",  # 2
+        "may tx but anchor was dropped by OCR",  # 3
+        "may tx 2",  # 4
+    ]
+    beg_anchors = [
+        "Beginning Balance as of 04/01/2025",
+        "Beginning Balance as of 05/01/2025",  # not found in any page
+    ]
+    ranges = _resolve_period_pages(pages, beg_anchors)
+    # First period covers page 1 (only page with its anchor) up to next-1.
+    # Second period falls back: first_page = prev_last + 1, capped at len(pages).
+    # Last period always extends to len(pages).
+    assert ranges[0][0] == 1
+    assert ranges[1][1] == len(pages)
+    assert ranges[1][0] >= ranges[0][0]
+
+
+def test_resolve_period_pages_empty_pages_returns_one_one() -> None:
+    """No raw.pages → (1, 1) for every chunk (backwards-compat)."""
+    from src.nodes.split_periods import _resolve_period_pages
+
+    ranges = _resolve_period_pages([], ["any anchor"])
+    assert ranges == [(1, 1)]

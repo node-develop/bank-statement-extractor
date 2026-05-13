@@ -164,40 +164,30 @@ def split_periods(state: GraphState) -> dict[str, Any]:
 
     chunks = []
 
+    # Resolve page ranges for ALL anchors up front so chunk k can know where
+    # chunk k+1 begins (architecture invariant: last_page = next_first - 1).
+    beg_anchors_str: list[str] = [
+        f"Beginning Balance as of {m.group(1)}/{m.group(2)}/{m.group(3)}"
+        for _, m in beg_matches[:n_chunks]
+    ]
+    page_ranges = _resolve_period_pages(raw.pages, beg_anchors_str)
+
     for k in range(n_chunks):
         beg_idx, beg_m = beg_matches[k]
-        _end_idx, end_m = end_matches[k]  # end_idx no longer used for slicing
 
-        mm_beg, dd_beg, yyyy_beg = beg_m.group(1), beg_m.group(2), beg_m.group(3)
-        mm_end, dd_end, yyyy_end = end_m.group(1), end_m.group(2), end_m.group(3)
-
+        mm_beg, _dd_beg, yyyy_beg = beg_m.group(1), beg_m.group(2), beg_m.group(3)
         chunk_id = f"period_{k + 1:02d}"
 
-        # Slice from this period's Beginning anchor up to (but not including)
-        # the NEXT period's Beginning anchor — NOT just up to the Ending
-        # Balance line. In Ixonia, "Ending Balance as of …" appears in the
-        # summary block ABOVE the transaction list; if we cut at end_idx we
-        # capture only ~6 lines of header and miss every transaction row.
-        # Last chunk extends to the end of the file.
+        # Slice ocr_slice up to next period's Beginning anchor (unchanged).
         if k + 1 < n_chunks:
             slice_end = beg_matches[k + 1][0]  # next period's Beginning line
         else:
             slice_end = len(lines)
         ocr_slice = "\n".join(lines[beg_idx:slice_end])
 
-        # ------------------------------------------------------------------
-        # Account-number lookback. Misses go into notes[], not errors[], because
-        # the LLM-based extract_account node will still try independently — the
-        # regex hint is informational, not a contract.
-        # ------------------------------------------------------------------
         account_hint_last4 = _find_account_hint(lines, beg_idx, mm_beg, yyyy_beg, notes)
 
-        # ------------------------------------------------------------------
-        # Page-range alignment (best-effort, raw.pages may be empty)
-        # ------------------------------------------------------------------
-        beg_anchor = f"Beginning Balance as of {mm_beg}/{dd_beg}/{yyyy_beg}"
-        end_anchor = f"Ending Balance as of {mm_end}/{dd_end}/{yyyy_end}"
-        first_page, last_page = _find_page_range(raw.pages, beg_anchor, end_anchor)
+        first_page, last_page = page_ranges[k]
         if raw.pages:
             pdf_text = "\n".join(raw.pages[first_page - 1 : last_page])
         else:
@@ -274,28 +264,56 @@ def _find_account_anywhere(lines: list[str]) -> str | None:
     return None
 
 
-def _find_page_range(pages: list[str], beg_anchor: str, end_anchor: str) -> tuple[int, int]:
-    """Return the 1-indexed (first_page, last_page) range containing the period.
+def _resolve_period_pages(
+    pages: list[str],
+    beg_anchors: list[str],
+) -> list[tuple[int, int]]:
+    """Return a list of (first_page, last_page) 1-indexed tuples, one per anchor.
 
-    Scans *pages* for the first page whose text contains *beg_anchor* and the
-    last page whose text contains *end_anchor*.  Falls back to ``(1, 1)`` when
-    *pages* is empty or no page contains the anchor.
+    Each chunk's last_page extends up to (but not including) the next chunk's
+    first_page; the final chunk extends to ``len(pages)``.  When an anchor is
+    not found in any page, fall back to ``previous_last_page + 1`` for that
+    chunk's first_page (or 1 if there is no previous chunk).
+
+    Backwards-compat: when ``pages`` is empty, return ``[(1, 1)]`` for every
+    anchor — same shape ``_find_page_range`` used to return.
     """
     if not pages:
-        return (1, 1)
+        return [(1, 1)] * len(beg_anchors)
 
-    first_page: int | None = None
-    last_page: int | None = None
+    n_pages = len(pages)
 
-    for i, page_text in enumerate(pages):
-        if first_page is None and beg_anchor in page_text:
-            first_page = i + 1
-        if end_anchor in page_text:
-            last_page = i + 1
+    # Pass 1: resolve first_page for each anchor (1-indexed).
+    # search_from progresses with each found anchor so duplicate anchor strings
+    # (e.g. Ixonia Sep 2024 carries two accounts under "Beginning Balance as of
+    # 09/01/2024") resolve to different pages instead of collapsing onto the
+    # first occurrence.
+    first_pages: list[int] = []
+    prev_last = 0  # 1-indexed; 0 means "no previous chunk"
+    search_from = 0  # 0-indexed page index to start the next scan from
+    for anchor in beg_anchors:
+        found: int | None = None
+        for i in range(search_from, n_pages):
+            if anchor in pages[i]:
+                found = i + 1
+                search_from = i + 1  # next anchor must come at a later page
+                break
+        if found is None:
+            # Fallback — start one page after the previous chunk, capped.
+            found = min(prev_last + 1, n_pages) if prev_last else 1
+            search_from = found  # progress so subsequent scans don't loop back
+        first_pages.append(found)
+        prev_last = found  # used only for fallback chaining; refined in pass 2
 
-    if first_page is None:
-        first_page = 1
-    if last_page is None:
-        last_page = first_page
+    # Pass 2: last_page = next_first - 1; final = n_pages.  Then cap.
+    ranges: list[tuple[int, int]] = []
+    for k, first in enumerate(first_pages):
+        if k + 1 < len(first_pages):
+            last = first_pages[k + 1] - 1
+        else:
+            last = n_pages
+        # Defensive cap (rule 12 — surface uncertainty rather than overshoot).
+        last = max(first, min(last, n_pages))
+        ranges.append((first, last))
 
-    return (first_page, last_page)
+    return ranges
