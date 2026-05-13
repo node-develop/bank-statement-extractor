@@ -402,6 +402,15 @@ def test_ixonia_page_ranges_non_overlapping_and_cover_all_pages() -> None:
         f"some pages are not covered by any chunk"
     )
 
+    # Spec criterion #4: chunks[0].pdf_text must be long enough to carry the
+    # full transaction list, not just the 1-page summary. Period_01 has 192
+    # transactions in the etalon; even at ~20 chars/tx the slice must be > 1500.
+    pdf_text_lengths = [len(c.pdf_text) for c in chunks]
+    assert chunks[0].pdf_text and len(chunks[0].pdf_text) > 1500, (
+        f"chunks[0].pdf_text length {len(chunks[0].pdf_text)} <= 1500; "
+        f"all chunk lengths={pdf_text_lengths}"
+    )
+
 
 def test_resolve_period_pages_uses_next_anchor() -> None:
     """_resolve_period_pages: each chunk extends up to next period's first page - 1."""
@@ -442,9 +451,9 @@ def test_resolve_period_pages_missing_anchor_falls_back_to_previous_last_plus_on
     # First period covers page 1 (only page with its anchor) up to next-1.
     # Second period falls back: first_page = prev_last + 1, capped at len(pages).
     # Last period always extends to len(pages).
-    assert ranges[0][0] == 1
-    assert ranges[1][1] == len(pages)
-    assert ranges[1][0] >= ranges[0][0]
+    # Tight assertion pins the fallback formula — a regression to `first_page = 1`
+    # (loop-back) would also satisfy the loose `>= ranges[0][0]` check.
+    assert ranges == [(1, 1), (2, 4)], f"expected fallback ranges [(1,1),(2,4)], got {ranges}"
 
 
 def test_resolve_period_pages_empty_pages_returns_one_one() -> None:
