@@ -33,6 +33,7 @@ from fastapi.responses import JSONResponse
 
 from src.api.logging import get_logger
 from src.api.routers.extract import router as extract_router
+from src.api.routers.reviews import router as reviews_router
 from src.graph.builder import build_graph
 from src.graph.checkpointer import build_async_checkpointer
 
@@ -58,7 +59,13 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     saver, teardown = await build_async_checkpointer()
     app.state.checkpointer = saver
     app.state.graph = build_graph(checkpointer=saver)
-    logger.info("lifespan: async checkpointer ready, graph compiled")
+    # Phase 4 — initialise the pending-reviews schema.  Done here (not at
+    # import time) so the Docker volume mount has happened before the
+    # sqlite file is created at /app/data/reviews.sqlite.
+    from src.api.reviews import init_reviews_db
+
+    init_reviews_db()
+    logger.info("lifespan: async checkpointer ready, graph compiled, reviews DB ready")
     try:
         yield
     finally:
@@ -124,6 +131,7 @@ def create_app() -> FastAPI:
     # Routers
     # ------------------------------------------------------------------
     application.include_router(extract_router)
+    application.include_router(reviews_router)
 
     # ------------------------------------------------------------------
     # Health probes

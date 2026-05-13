@@ -80,6 +80,7 @@ from langgraph.types import Send
 from src.api.logging import get_logger
 from src.graph.state import GraphState
 from src.nodes.apply_critic_hint import apply_critic_hint
+from src.nodes.apply_human_corrections import apply_human_corrections
 from src.nodes.await_review import await_review
 from src.nodes.classify_layout import classify_layout
 from src.nodes.critic_loop import critic, route_after_verifier, should_run_critic
@@ -218,9 +219,33 @@ def build_graph(checkpointer: object | None = None) -> Any:
     )
 
     # ------------------------------------------------------------------
-    # HITL path: await_review → finalize
+    # HITL path (Phase 4): await_review → {apply_human_corrections | finalize}
+    # ``route_after_review`` reads ``force_resume`` and the corrections list
+    # to decide whether to re-extract or accept the partial result.
     # ------------------------------------------------------------------
-    graph.add_edge("await_review", "finalize")
+    def _route_after_review(state: GraphState) -> str:
+        if state.get("force_resume"):
+            return "finalize"
+        if state.get("human_corrections"):
+            return "apply_human_corrections"
+        return "finalize"
+
+    graph.add_node("apply_human_corrections", apply_human_corrections)
+    graph.add_conditional_edges(
+        "await_review",
+        _route_after_review,
+        {
+            "apply_human_corrections": "apply_human_corrections",
+            "finalize": "finalize",
+        },
+    )
+    # apply_human_corrections returns list[Send] targeting extract_transactions;
+    # those sends loop back through merge_state → verifier as before.
+    graph.add_conditional_edges(
+        "apply_human_corrections",
+        apply_human_corrections,
+        ["extract_transactions"],
+    )
 
     # ------------------------------------------------------------------
     # Terminal

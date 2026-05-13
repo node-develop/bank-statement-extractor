@@ -21,7 +21,7 @@ import tempfile
 import uuid
 from decimal import Decimal
 from hashlib import sha256
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, BackgroundTasks, File, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse
@@ -175,6 +175,52 @@ async def extract(
                 content={"error": "pdf_unreadable", "detail": str(exc)},
             )
         raise
+
+    # Phase 4 — detect await_review pause: when the graph hit interrupt(),
+    # 'final' is absent and '__interrupt__' carries the suspect payload.
+    # Insert a pending_reviews row and return a partial ExtractResult with
+    # pending_review set so the frontend can render the modal.
+    if "final" not in result_state and "__interrupt__" in result_state:
+        from uuid import uuid4
+
+        from src.api import reviews as reviews_db
+        from src.models import PendingReview
+
+        # interrupts is list[Interrupt(value=...)]; take the first.
+        interrupts: Any = result_state.get("__interrupt__", [])
+        payload: dict[str, Any] = (
+            interrupts[0].value if interrupts and hasattr(interrupts[0], "value") else {}
+        )
+        suspect_count = len(payload.get("suspects", []))
+        reason = payload.get("reason", "suspects_exceeded")
+        extraction_id = str(uuid4())
+        reviews_db.insert_pending(
+            extraction_id=extraction_id,
+            thread_id=thread_id,
+            statement_sha256=digest,
+            suspect_count=suspect_count,
+            reason=reason,
+            review_payload=payload,
+        )
+        logger.info(
+            "extract: paused at await_review thread_id=%s extraction_id=%s reason=%s suspects=%d",
+            thread_id,
+            extraction_id,
+            reason,
+            suspect_count,
+        )
+        raw_errors = result_state.get("errors", [])
+        errors_list: list[str] = list(raw_errors) if isinstance(raw_errors, list) else []
+        return ExtractResult(
+            periods=[],
+            statement_sha256=digest,
+            errors=errors_list,
+            pending_review=PendingReview(
+                extraction_id=extraction_id,
+                reason=reason,
+                suspect_count=suspect_count,
+            ),
+        )
 
     extract_result: ExtractResult = result_state["final"]  # type: ignore[assignment]
     logger.info(
