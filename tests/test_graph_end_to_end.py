@@ -266,8 +266,11 @@ class TestE2ESinglePeriodReconciles:
                 "summaries": [],
                 "transactions": [],
                 "reconciliations": [],
+                "verifier_reports": [],
                 "retry_count": 0,
                 "errors": [],
+                # Phase 3 — required by the _add_decimal reducer in GraphState.
+                "cumulative_cost_usd": Decimal("0"),
             }
             config: dict[str, Any] = {
                 "recursion_limit": 50,

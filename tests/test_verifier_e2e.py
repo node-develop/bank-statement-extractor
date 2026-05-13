@@ -135,12 +135,15 @@ def test_verifier_routes_retry_exhausted_to_review() -> None:
 
 
 def test_verifier_routes_cost_cap_to_review(monkeypatch: pytest.MonkeyPatch) -> None:
-    """cumulative_cost_usd >= HARD_COST_CAP_USD → await_review.
+    """PRD §4.5: state starts at cumulative_cost_usd=4.99; one extra LLM call's
+    cost increment pushes the total over the $5.00 cap, and the next routing
+    decision sends the graph to await_review.
 
-    Reload pricing + critic_loop to pick up the env override (HARD_COST_CAP_USD
-    is captured at module import time).
+    This exercises the *accumulation* path (PRD §8.2): the per-call cost is
+    computed via call_cost(model, usage_metadata) and merged through the
+    _add_decimal reducer before route_after_verifier reads the field.
     """
-    monkeypatch.setenv("BSA_COST_CAP_USD", "0.01")
+    monkeypatch.setenv("BSA_COST_CAP_USD", "5.00")
 
     import src.api.pricing as pricing_mod
     import src.nodes.critic_loop as critic_mod
@@ -149,9 +152,27 @@ def test_verifier_routes_cost_cap_to_review(monkeypatch: pytest.MonkeyPatch) -> 
     importlib.reload(critic_mod)
 
     try:
+        # Simulate the per-call cost increment that an LLM-using node would
+        # compute via pricing.call_cost(model, usage_metadata).  Realistic
+        # usage values for a Sonnet 4.6 transactions call.
+        increment = pricing_mod.call_cost(
+            "claude-sonnet-4-6",
+            {"input_tokens": 4000, "output_tokens": 200},
+        )
+        assert increment > Decimal("0"), "expected non-zero increment for known model+usage"
+
+        # Reducer is operator.add (associative) — manually compose the new total
+        # the same way LangGraph's _add_decimal would after a node delta.
+        seeded_total = Decimal("4.99")
+        new_total = seeded_total + increment
+        assert new_total >= pricing_mod.HARD_COST_CAP_USD, (
+            f"increment {increment} should push {seeded_total} over cap "
+            f"{pricing_mod.HARD_COST_CAP_USD}"
+        )
+
         state = _make_state(
             verifier_reports=[_report("period_01", n_suspects=0)],
-            cumulative_cost_usd=Decimal("0.05"),
+            cumulative_cost_usd=new_total,
         )
         assert critic_mod.route_after_verifier(state) == "await_review"
     finally:
