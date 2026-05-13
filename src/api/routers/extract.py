@@ -27,11 +27,64 @@ from fastapi import APIRouter, BackgroundTasks, File, HTTPException, Request, Up
 from fastapi.responses import JSONResponse
 
 from src.api.logging import get_logger
-from src.models import ExtractResult
+from src.models import (
+    ExtractResult,
+    PeriodResult,
+    Reconciliation,
+)
 
 logger = get_logger(__name__)
 
 router = APIRouter()
+
+
+def _build_partial_periods_on_pause(
+    state: dict[str, Any],
+) -> list[PeriodResult]:
+    """Assemble PeriodResult objects from state when the graph paused at
+    ``await_review`` (rule 12 — surface what we have, never silently empty).
+
+    For every period_chunk that has account+summary+layout extracted, we
+    emit a PeriodResult with a placeholder ``Reconciliation`` marking
+    ``reconciled=False`` and a note explaining the pause.  Verifier output
+    is attached when present so the frontend can render per-row suspects.
+    """
+    from decimal import Decimal
+
+    chunks = state.get("period_chunks", []) or []
+    accounts = {a.chunk_id: a for a in state.get("accounts", []) or []}
+    summaries = {s.chunk_id: s for s in state.get("summaries", []) or []}
+    layouts = {la.chunk_id: la for la in state.get("layouts", []) or []}
+    verifier_reports = {v.chunk_id: v for v in state.get("verifier_reports", []) or []}
+    txs_by_chunk: dict[str, list[Any]] = {}
+    for t in state.get("transactions", []) or []:
+        txs_by_chunk.setdefault(t.chunk_id, []).append(t)
+
+    out: list[PeriodResult] = []
+    for chunk in chunks:
+        cid = chunk.chunk_id
+        if cid not in accounts or cid not in summaries:
+            continue
+        layout_label = layouts.get(cid)
+        layout_str = layout_label.label if layout_label is not None else "unknown"
+        out.append(
+            PeriodResult(
+                chunk_id=cid,
+                account=accounts[cid],
+                summary=summaries[cid],
+                transactions=txs_by_chunk.get(cid, []),
+                layout=layout_str,
+                reconciliation=Reconciliation(
+                    chunk_id=cid,
+                    reconciled=False,
+                    delta=Decimal("0.00"),
+                    notes=["paused at await_review before reconcile could run"],
+                ),
+                verifier=verifier_reports.get(cid),
+            )
+        )
+    return out
+
 
 _MAX_PDF_BYTES = 80 * 1024 * 1024  # 80 MB (Ixonia Binder2 is ~54 MB)
 _MAX_OCR_BYTES = 5 * 1024 * 1024  # 5 MB
@@ -211,8 +264,9 @@ async def extract(
         )
         raw_errors = result_state.get("errors", [])
         errors_list: list[str] = list(raw_errors) if isinstance(raw_errors, list) else []
+        partial_periods = _build_partial_periods_on_pause(result_state)
         return ExtractResult(
-            periods=[],
+            periods=partial_periods,
             statement_sha256=digest,
             errors=errors_list,
             pending_review=PendingReview(
