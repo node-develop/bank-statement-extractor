@@ -48,8 +48,8 @@ def _get_llm() -> Any:
         from langchain_anthropic import ChatAnthropic
 
         _LLM_INSTANCE = ChatAnthropic(  # type: ignore[call-arg]
-            model="claude-sonnet-4-6",
-            max_tokens=4096,
+            model="claude-haiku-4-5",
+            max_tokens=1024,
             temperature=0,
             timeout=60,
         )

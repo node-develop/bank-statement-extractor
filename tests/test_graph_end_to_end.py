@@ -199,9 +199,19 @@ def _llm_for_summary(summary: Summary) -> MagicMock:
 
 
 def _llm_for_transactions(txs: list[Transaction]) -> MagicMock:
-    """Mock for extract_transactions, which uses a _TransactionList wrapper."""
+    """Mock for extract_transactions, which uses a _TransactionList wrapper.
+
+    extract_transactions strips ``chunk_id`` from its LLM-facing schema and
+    re-injects it server-side, so the mocked rows must omit ``chunk_id``
+    from ``model_dump()`` to avoid a duplicate-kwarg TypeError.
+    """
+    rows = []
+    for tx in txs:
+        row = MagicMock()
+        row.model_dump.return_value = tx.model_dump(exclude={"chunk_id"})
+        rows.append(row)
     tx_list_mock = MagicMock()
-    tx_list_mock.transactions = txs
+    tx_list_mock.transactions = rows
     structured = MagicMock()
     structured.invoke.return_value = tx_list_mock
     llm = MagicMock()

@@ -2,7 +2,7 @@
 name: extract_summary
 description: Extract the period monetary summary (beginning/ending balances, deposit and withdrawal totals and counts) from one period chunk. Structured output for the Summary model.
 version: 1
-model: claude-sonnet-4-6
+model: claude-haiku-4-5
 ---
 
 ## Role
