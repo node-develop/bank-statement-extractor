@@ -70,17 +70,19 @@ def split_periods(state: GraphState) -> dict[str, Any]:
                 "%d pdfplumber pages joined as text",
                 len(raw.pages),
             )
+            # Informational only — do NOT pollute the user-facing errors[]
+            # channel when the fallback completes successfully.
             ocr_text = joined_pages
-            errors.append(
-                "split_periods: no OCR text supplied; using pdfplumber page text. "
-                "Ixonia-style anchors may not match — whole-doc chunk fallback engaged."
-            )
         else:
-            logger.warning("split_periods: raw.ocr_text is empty and pdfplumber pages have no text")
+            logger.warning(
+                "split_periods: raw.ocr_text empty AND pdfplumber pages have 0 chars "
+                "(image-based PDF)"
+            )
             return {
                 "period_chunks": [],
                 "errors": [
-                    "split_periods: raw.ocr_text is empty and pdfplumber pages have no text"
+                    "This PDF appears to be image-based (scanned, no embedded text). "
+                    "Upload an OCR-text companion (.txt) via the 'attach' link."
                 ],
             }
 
