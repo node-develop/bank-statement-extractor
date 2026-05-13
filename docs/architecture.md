@@ -15,22 +15,50 @@ per-period results back into list-shaped state.
 ```
 ingest ──► split_periods ──► (Send per chunk)
                                 ├─► classify_layout (Haiku 4.5)
-                                ├─► extract_account
-                                ├─► extract_summary
-                                └─► extract_transactions
+                                ├─► extract_account   (Haiku 4.5)
+                                ├─► extract_summary   (Haiku 4.5)
+                                └─► extract_transactions (Sonnet 4.6)
                                           │
                                           ▼
                                     merge_state
                                           │
                                           ▼
-                                    reconcile (pure Python, per period)
-                                    │           │
-                                    │           ▼
-                                    │      critic_loop (≤ N=2 retries)
-                                    │           │
-                                    ▼           ▼
-                                  finalize ◄────┘
+                                    verifier (pure Python C1-C6)
+                                          │
+                                          ▼
+                                  route_after_verifier
+                                  ┌───────┼───────┐
+                                  │       │       │
+                                  ▼       ▼       ▼
+                           reconcile   critic   await_review
+                                │        │            │
+                                │        ▼            │
+                                │   apply_critic_hint │
+                                │        │            │
+                                │        ▼            │
+                                │   [Send extract_*]──► merge_state (loop)
+                                │                     │
+                                ▼                     ▼
+                              finalize ◄──────────────┘
+                                  │
+                                  ▼
+                                 END
 ```
+
+Phase 3 routing decision (`src/nodes/critic_loop.py:route_after_verifier`):
+
+- **clean** (no suspects, cost cap not exceeded) → `reconcile` → `finalize`
+- **1-3 suspects + retries left** → `critic` → `apply_critic_hint` → loop
+- **>3 suspects | retry_count>=2 | cost cap exceeded** → `await_review`
+  (LangGraph `interrupt()` pauses for HITL; resume via `Command(resume=...)`)
+
+Cost ceiling enforcement (PRD §8): every LLM-using node returns a
+`cumulative_cost_usd` increment computed from `usage_metadata` against the
+frozen pricing table in `src/api/pricing.py`. The `operator.add` reducer on
+`Decimal` is associative, so parallel `Send` fan-out is safe. When the
+cumulative total reaches `HARD_COST_CAP_USD` (default `$5.00`, overridable
+via `BSA_COST_CAP_USD`), `route_after_verifier` short-circuits to
+`await_review` regardless of suspect count.
 
 - `ingest` — load PDF (pdfplumber primary, pypdf fallback). If `txt_path` is
   given, load OCR text. **Source-selection policy is here, not silently inside

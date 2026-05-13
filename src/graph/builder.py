@@ -1,7 +1,7 @@
 """Graph builder for the bank-statement-analizer extraction pipeline.
 
-Topology (architecture.md)
---------------------------
+Topology (architecture.md — Phase 3)
+--------------------------------------
 ::
 
     START
@@ -9,11 +9,13 @@ Topology (architecture.md)
       → split_periods
       → [Send per PeriodChunk x 4 extractors]
            → classify_layout  ─┐
-           → extract_account   ├─→ merge_state → reconcile
+           → extract_account   ├─→ merge_state → verifier
            → extract_summary   │                     │
-           → extract_transactions ─┘          should_run_critic
-                                                ├── critic → merge_state (loop)
-                                                └── finalize → END
+           → extract_transactions ─┘        route_after_verifier
+                                            ├── reconcile → finalize → END
+                                            ├── critic → apply_critic_hint
+                                            │               → [Send] → merge_state (loop)
+                                            └── await_review → finalize → END
 
 Fan-out
 -------
@@ -31,13 +33,28 @@ LangGraph waits for all parallel branches to complete before running
 ``merge_state`` because it is the single downstream sink for each of those
 edges.
 
-Critic loop
------------
-After ``reconcile``, ``should_run_critic`` routes to ``"critic"`` when any
-reconciliation failed and ``retry_count < 2``, otherwise to ``"finalize"``.
-In M2 R3 the critic records a hint in ``errors[]`` but does NOT re-invoke any
-extractor — that is wired in M3.  After ``critic`` the edge returns to
-``merge_state`` so the graph completes the loop cleanly.
+Verifier + routing
+------------------
+After ``merge_state``, ``verifier`` runs deterministic C1-C6 checks and
+populates ``verifier_reports``.  ``route_after_verifier`` then decides:
+- ``"reconcile"`` — all reports have confidence==1.0 and cost not capped.
+- ``"critic"``    — 1-3 suspects, retry_count < 2.
+- ``"await_review"`` — cost cap hit, >3 suspects, or retry exhausted.
+
+Critic retry loop
+-----------------
+After ``critic`` emits a ``CriticHint``, ``apply_critic_hint`` turns it into
+a ``Send`` re-running one extractor for one chunk.  The re-run result flows
+back through ``merge_state → verifier → route_after_verifier``.
+``retry_count`` is bumped each pass; ``route_after_verifier`` caps at 2.
+
+Cost ceiling
+------------
+``cumulative_cost_usd`` (Annotated[Decimal, _add_decimal] in GraphState)
+accumulates per-call cost deltas returned by every LLM-using node.  When
+the total reaches ``HARD_COST_CAP_USD`` (default $5.00, overridable via
+``BSA_COST_CAP_USD`` env var), ``route_after_verifier`` routes to
+``await_review`` regardless of suspect count.
 
 LangGraph API notes (confirmed via context7)
 --------------------------------------------
@@ -54,6 +71,7 @@ LangGraph API notes (confirmed via context7)
 from __future__ import annotations
 
 import uuid
+from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
 from langgraph.graph import END, START, StateGraph
@@ -61,8 +79,10 @@ from langgraph.types import Send
 
 from src.api.logging import get_logger
 from src.graph.state import GraphState
+from src.nodes.apply_critic_hint import apply_critic_hint
+from src.nodes.await_review import await_review
 from src.nodes.classify_layout import classify_layout
-from src.nodes.critic_loop import critic, should_run_critic
+from src.nodes.critic_loop import critic, route_after_verifier, should_run_critic
 from src.nodes.extract_account import extract_account
 from src.nodes.extract_summary import extract_summary
 from src.nodes.extract_transactions import extract_transactions
@@ -71,9 +91,14 @@ from src.nodes.ingest import ingest
 from src.nodes.merge_state import merge_state
 from src.nodes.reconcile import reconcile
 from src.nodes.split_periods import split_periods
+from src.nodes.verifier import verifier
 
 if TYPE_CHECKING:
     from src.models import ExtractResult, PeriodChunk
+
+# Keep should_run_critic imported so existing code that references it via
+# builder doesn't break; it is no longer wired into the graph.
+__all__ = ["build_graph", "run_extract", "should_run_critic"]
 
 logger = get_logger(__name__)
 
@@ -133,8 +158,11 @@ def build_graph(checkpointer: object | None = None) -> Any:
     graph.add_node("extract_summary", extract_summary)  # type: ignore[arg-type]
     graph.add_node("extract_transactions", extract_transactions)  # type: ignore[arg-type]
     graph.add_node("merge_state", merge_state)
+    graph.add_node("verifier", verifier)
     graph.add_node("reconcile", reconcile)
     graph.add_node("critic", critic)
+    graph.add_node("apply_critic_hint", apply_critic_hint)
+    graph.add_node("await_review", await_review)
     graph.add_node("finalize", finalize)
 
     # ------------------------------------------------------------------
@@ -164,20 +192,35 @@ def build_graph(checkpointer: object | None = None) -> Any:
     graph.add_edge("extract_transactions", "merge_state")
 
     # ------------------------------------------------------------------
-    # Post-join: merge_state → reconcile → conditional critic/finalize
+    # Post-join: merge_state → verifier → conditional routing
     # ------------------------------------------------------------------
-    graph.add_edge("merge_state", "reconcile")
+    graph.add_edge("merge_state", "verifier")
     graph.add_conditional_edges(
-        "reconcile",
-        should_run_critic,
-        {"critic": "critic", "finalize": "finalize"},
+        "verifier",
+        route_after_verifier,
+        {"reconcile": "reconcile", "critic": "critic", "await_review": "await_review"},
     )
 
     # ------------------------------------------------------------------
-    # Critic loop: critic → merge_state (loop back; retry_count cap
-    # enforced by should_run_critic routing to finalize at retry_count≥2)
+    # Happy path: reconcile → finalize
     # ------------------------------------------------------------------
-    graph.add_edge("critic", "merge_state")
+    graph.add_edge("reconcile", "finalize")
+
+    # ------------------------------------------------------------------
+    # Critic retry loop:
+    # critic → apply_critic_hint (Send fan-out) → extractor → merge_state (loop)
+    # apply_critic_hint returns list[Send] targeting one of the extract_* nodes.
+    # ------------------------------------------------------------------
+    graph.add_conditional_edges(
+        "critic",
+        apply_critic_hint,
+        ["extract_account", "extract_summary", "extract_transactions"],
+    )
+
+    # ------------------------------------------------------------------
+    # HITL path: await_review → finalize
+    # ------------------------------------------------------------------
+    graph.add_edge("await_review", "finalize")
 
     # ------------------------------------------------------------------
     # Terminal
@@ -194,7 +237,7 @@ def build_graph(checkpointer: object | None = None) -> Any:
     else:
         compiled = graph.compile()
 
-    logger.info("build_graph: compiled extraction graph")
+    logger.info("build_graph: compiled extraction graph (Phase 3 topology)")
     return compiled
 
 
@@ -243,8 +286,10 @@ def run_extract(pdf_path: str, txt_path: str | None = None) -> ExtractResult:
             "summaries": [],
             "transactions": [],
             "reconciliations": [],
+            "verifier_reports": [],
             "retry_count": 0,
             "errors": [],
+            "cumulative_cost_usd": Decimal("0"),
         }
         config: dict[str, Any] = {
             "configurable": {"thread_id": thread_id},

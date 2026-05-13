@@ -16,6 +16,7 @@ import anthropic
 from pydantic import ValidationError
 
 from src.api.logging import get_logger
+from src.api.pricing import call_cost
 from src.models import LayoutLabel, PeriodChunk
 from src.prompts import load_prompt
 
@@ -136,10 +137,29 @@ def _invoke_llm(chunk: PeriodChunk, text: str) -> dict[str, Any]:
     )
     user = HumanMessage(content=text)
 
-    llm_with_output = _get_llm().with_structured_output(LayoutLabel)
-    raw_result: LayoutLabel = llm_with_output.invoke([system, user])
+    # include_raw=True returns {"raw": AIMessage, "parsed": LayoutLabel, "parsing_error": None}
+    # so we can read usage_metadata for cost tracking (PRD §8.2).
+    # Defensive: test mocks may return the parsed model directly — fall back.
+    llm_with_output = _get_llm().with_structured_output(LayoutLabel, include_raw=True)
+    invoke_result: Any = llm_with_output.invoke([system, user])
+    if isinstance(invoke_result, dict):
+        raw_msg = invoke_result.get("raw")
+        raw_result: LayoutLabel = invoke_result.get("parsed")  # type: ignore[assignment]
+    else:
+        raw_msg = None
+        raw_result = invoke_result
+
+    # Cost tracking — read usage_metadata from the AIMessage.
+    usage_md = getattr(raw_msg, "usage_metadata", None) or {}
+    this_call_cost = call_cost(_get_llm().model, usage_md if isinstance(usage_md, dict) else {})
+    if this_call_cost == 0 and usage_md:
+        logger.warning(
+            "classify_layout: call_cost returned 0 for model=%r; usage_metadata=%r",
+            _get_llm().model,
+            usage_md,
+        )
 
     # Always overwrite chunk_id from the input chunk — the LLM output's
     # chunk_id is unreliable because the model may echo the exemplar id.
     label = LayoutLabel(chunk_id=chunk.chunk_id, label=raw_result.label)
-    return {"layouts": [label]}
+    return {"layouts": [label], "cumulative_cost_usd": this_call_cost}

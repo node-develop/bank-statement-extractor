@@ -1,44 +1,43 @@
-"""``critic`` graph node + routing helpers — emit a ``CriticHint`` on reconciliation failure.
+"""``critic`` graph node + routing helpers — Phase 3 rewrite.
 
-M2 R3 scope
------------
-The critic node runs **once** per graph execution when any ``Reconciliation``
-has ``reconciled=False``.  It calls Haiku 4.5 with the reconciliation failure
-context, records the hint in ``state["errors"]``, and increments
-``retry_count``.
+Phase 3 changes (PRD §4.2.1)
+-----------------------------
+The critic node now consumes ``state["verifier_reports"]`` instead of
+``state["reconciliations"]``.  In the new topology, reconciliation has NOT
+run yet when ``critic`` is invoked (verifier precedes reconcile); the old
+behaviour that early-returned on empty ``reconciliations`` would silently
+no-op.
 
-M3 will wire the actual extractor retry by reading ``pending_hint`` and
-re-dispatching to the relevant extractor node.  In this milestone, the hint is
-recorded but the extractor is NOT re-invoked.
+``route_after_verifier`` (NEW) is the conditional-edge router placed after
+``verifier``.  It replaces ``should_run_critic`` as the primary routing
+function; ``should_run_critic`` is kept for backward-compatibility but is
+marked deprecated.
 
-Design decisions
-----------------
-- ``CriticHint`` is internal to this module; the spec requires it is NOT
-  exported from ``src/models``.
-- ``_RECOVERABLE`` covers all expected failure modes: Anthropic API errors,
-  Pydantic validation failures, and Python structural errors.  On any of these
-  the node still bumps ``retry_count`` so the graph exits cleanly on the next
-  ``should_run_critic`` check.
+``apply_critic_hint`` is a separate node in ``src/nodes/apply_critic_hint.py``
+(PRD §4.2.2).
+
+Design decisions (unchanged from M2)
+-------------------------------------
+- ``CriticHint`` is internal to this module; NOT exported from ``src/models``.
+- ``_RECOVERABLE`` covers all expected failure modes.
 - The prompt is loaded from ``src/prompts/critic.md`` via ``load_prompt``.
-  The stable prefix (everything before ``## Reconciliation failure``) is sent
-  with ``cache_control: ephemeral``; the dynamic failure context is sent as a
-  separate uncached block.
-- ``should_run_critic`` is the conditional-edge router read by ``builder.py``.
 """
 
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Literal
 
 import anthropic
 from pydantic import BaseModel, ValidationError
 
 from src.api.logging import get_logger
+from src.api.pricing import call_cost
 from src.graph.state import GraphState  # noqa: TC001 — runtime-required by LangGraph
 from src.prompts import load_prompt
 
 if TYPE_CHECKING:
-    from src.models import Reconciliation
+    from src.models import VerifierReport
 
 logger = get_logger(__name__)
 
@@ -90,17 +89,68 @@ def _get_llm() -> Any:
 
 
 # ---------------------------------------------------------------------------
-# Public node
+# Public routing function (Phase 3)
 # ---------------------------------------------------------------------------
 
 
-def critic(state: GraphState) -> dict[str, Any]:
-    """Diagnose the first un-reconciled chunk and record a hint in ``errors[]``.
+def route_after_verifier(state: GraphState) -> str:
+    """Route after ``verifier``: reconcile (clean), critic (1-3 suspects, retries left),
+    or await_review (cost-cap | many suspects | retry exhausted).
 
     Parameters
     ----------
     state:
-        Full ``GraphState`` after ``reconcile`` has run.
+        Full ``GraphState`` after ``verifier`` has populated
+        ``state["verifier_reports"]``.
+
+    Returns
+    -------
+    str
+        One of ``"reconcile"``, ``"critic"``, or ``"await_review"``.
+    """
+    from src.api.pricing import HARD_COST_CAP_USD
+
+    reports = state.get("verifier_reports", [])
+    total_suspects = sum(len(r.suspects) for r in reports)
+    retry = state.get("retry_count", 0)
+    cost_capped = state.get("cumulative_cost_usd", Decimal("0")) >= HARD_COST_CAP_USD
+
+    if total_suspects == 0 and not cost_capped:
+        logger.info("route_after_verifier: clean — routing to reconcile")
+        return "reconcile"
+    if cost_capped or total_suspects > 3 or retry >= 2:
+        logger.info(
+            "route_after_verifier: routing to await_review "
+            "(cost_capped=%s, total_suspects=%d, retry=%d)",
+            cost_capped,
+            total_suspects,
+            retry,
+        )
+        return "await_review"
+    logger.info(
+        "route_after_verifier: routing to critic (total_suspects=%d, retry=%d)",
+        total_suspects,
+        retry,
+    )
+    return "critic"
+
+
+# ---------------------------------------------------------------------------
+# Public node (Phase 3 rewrite)
+# ---------------------------------------------------------------------------
+
+
+def critic(state: GraphState) -> dict[str, Any]:
+    """Diagnose the first verifier-flagged chunk and emit a ``CriticHint``.
+
+    Phase 3: reads ``state["verifier_reports"]`` instead of
+    ``state["reconciliations"]`` (reconcile has not run yet in the new
+    topology).
+
+    Parameters
+    ----------
+    state:
+        Full ``GraphState`` after ``verifier`` has run.
 
     Returns
     -------
@@ -113,35 +163,36 @@ def critic(state: GraphState) -> dict[str, Any]:
     Notes
     -----
     This node **never raises** — all recoverable failures are captured in
-    ``errors[]`` so the graph can continue to ``finalize``.
+    ``errors[]`` so the graph can continue.
     """
-    reconciliations = state.get("reconciliations", [])
+    reports_with_suspects: list[VerifierReport] = [
+        r for r in state.get("verifier_reports", []) if r.suspects
+    ]
     current_retry = state.get("retry_count", 0)
 
-    # Belt-and-braces: if all are reconciled, do nothing.
-    failed = [r for r in reconciliations if not r.reconciled]
-    if not failed:
-        logger.info("critic: all periods reconciled — nothing to do")
-        return {"errors": ["critic invoked but all periods reconciled"]}
+    if not reports_with_suspects:
+        logger.info("critic: no verifier suspects — nothing to do")
+        return {"errors": ["critic invoked but no verifier suspects"]}
 
-    target_rec = failed[0]
-    chunk_id = target_rec.chunk_id
+    target_report = reports_with_suspects[0]
+    chunk_id = target_report.chunk_id
 
     logger.info(
-        "critic: analysing chunk_id=%s delta=%s retry_count=%d",
+        "critic: analysing chunk_id=%s suspects=%d retry_count=%d",
         chunk_id,
-        target_rec.delta,
+        len(target_report.suspects),
         current_retry,
     )
 
     try:
-        hint = _invoke_critic_llm(state, target_rec)
+        hint, this_call_cost = _invoke_critic_llm(state, target_report)
         hint_str = f"critic suggested: rerun {hint.extractor} on {hint.chunk_id} -- {hint.hint}"
         logger.info("critic: %s", hint_str)
         return {
             "retry_count": current_retry + 1,
             "pending_hint": hint,
             "errors": [hint_str],
+            "cumulative_cost_usd": this_call_cost,
         }
     except _RECOVERABLE as exc:
         error_msg = (
@@ -155,12 +206,16 @@ def critic(state: GraphState) -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
-# Conditional-edge router
+# Deprecated conditional-edge router (kept for backward compatibility)
 # ---------------------------------------------------------------------------
 
 
 def should_run_critic(state: GraphState) -> str:
-    """Routing function for the conditional edge after ``reconcile``.
+    """DEPRECATED — superseded by ``route_after_verifier`` in Phase 3.
+
+    Kept to avoid import errors in any test or code that still references it.
+    In the new topology (Phase 3), this function is no longer wired into the
+    graph; ``route_after_verifier`` is the active router after ``verifier``.
 
     Returns
     -------
@@ -174,11 +229,13 @@ def should_run_critic(state: GraphState) -> str:
     retry_count = state.get("retry_count", 0)
 
     if has_failure and retry_count < 2:
-        logger.info("should_run_critic: routing to critic (retry_count=%d)", retry_count)
+        logger.info(
+            "should_run_critic (deprecated): routing to critic (retry_count=%d)", retry_count
+        )
         return "critic"
 
     logger.info(
-        "should_run_critic: routing to finalize (has_failure=%s, retry_count=%d)",
+        "should_run_critic (deprecated): routing to finalize (has_failure=%s, retry_count=%d)",
         has_failure,
         retry_count,
     )
@@ -192,14 +249,19 @@ def should_run_critic(state: GraphState) -> str:
 
 def _invoke_critic_llm(
     state: GraphState,
-    rec: Reconciliation,
-) -> CriticHint:
-    """Call Haiku 4.5 and parse the structured ``CriticHint`` response.
+    report: VerifierReport,
+) -> tuple[CriticHint, Decimal]:
+    """Call Haiku 4.5 with verifier-suspect context and parse the ``CriticHint``.
+
+    Returns
+    -------
+    tuple[CriticHint, Decimal]
+        The parsed hint and the USD cost of this LLM call.
 
     Two-block prompt pattern (architecture.md):
     - Block 1 (stable prefix, cache_control ephemeral): everything before the
       ``## Reconciliation failure`` section in critic.md.
-    - Block 2 (dynamic, no cache): the serialised failure context.
+    - Block 2 (dynamic, no cache): the serialised suspect context.
     """
     from langchain_core.messages import HumanMessage, SystemMessage
 
@@ -211,8 +273,7 @@ def _invoke_critic_llm(
         # Malformed prompt: use whole body as stable prefix.
         stable_prefix = prompt_body
 
-    # Build dynamic failure context
-    chunk_id = rec.chunk_id
+    chunk_id = report.chunk_id
     summaries = state.get("summaries", [])
     transactions = state.get("transactions", [])
 
@@ -221,18 +282,24 @@ def _invoke_critic_llm(
     tx_count = len(chunk_txs)
 
     summary_json = summary.model_dump_json() if summary is not None else "null"
-    notes_joined = "\n".join(f"- {n}" for n in rec.notes) if rec.notes else "(none)"
+
+    # Format first ~5 suspects for the dynamic block
+    suspect_lines = []
+    for s in report.suspects[:5]:
+        line = f"- [{s.code}] row {s.row_index}: {s.reason}"
+        if s.expected is not None:
+            line += f" (expected={s.expected}, actual={s.actual})"
+        suspect_lines.append(line)
+    suspects_str = "\n".join(suspect_lines) if suspect_lines else "(none)"
 
     dynamic_block = (
         f"## Reconciliation failure for chunk {chunk_id}\n\n"
         f"Summary: {summary_json}\n"
         f"Transactions count={tx_count}\n"
-        f"Delta={rec.delta}\n"
-        f"{notes_joined}"
+        f"Verifier suspects ({len(report.suspects)} total):\n"
+        f"{suspects_str}"
     )
 
-    # Stable prefix → SystemMessage (cached).  Dynamic block → HumanMessage
-    # (Anthropic requires ≥1 user message in messages[]).
     system = SystemMessage(
         content=[
             {
@@ -244,12 +311,32 @@ def _invoke_critic_llm(
     )
     user = HumanMessage(content=dynamic_block)
 
-    llm_with_output = _get_llm().with_structured_output(CriticHint)
-    result: CriticHint = llm_with_output.invoke([system, user])
+    # include_raw=True → {"raw": AIMessage, "parsed": CriticHint, "parsing_error": None}
+    # so we can read usage_metadata for cost tracking (PRD §8.2).
+    # Defensive: test mocks may return the parsed model directly — fall back.
+    llm_with_output = _get_llm().with_structured_output(CriticHint, include_raw=True)
+    invoke_result: Any = llm_with_output.invoke([system, user])
+    if isinstance(invoke_result, dict):
+        raw_msg = invoke_result.get("raw")
+        result: CriticHint = invoke_result.get("parsed")  # type: ignore[assignment]
+    else:
+        raw_msg = None
+        result = invoke_result
+
+    # Cost tracking.
+    usage_md = getattr(raw_msg, "usage_metadata", None) or {}
+    this_call_cost = call_cost(_get_llm().model, usage_md if isinstance(usage_md, dict) else {})
+    if this_call_cost == 0 and usage_md:
+        logger.warning(
+            "critic: call_cost returned 0 for model=%r; usage_metadata=%r",
+            _get_llm().model,
+            usage_md,
+        )
 
     # Ensure chunk_id is propagated from the failure context, not the LLM echo.
-    return CriticHint(
+    hint = CriticHint(
         chunk_id=chunk_id,
         extractor=result.extractor,
         hint=result.hint,
     )
+    return hint, this_call_cost
