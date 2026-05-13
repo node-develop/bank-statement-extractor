@@ -42,7 +42,8 @@ def _default_db_path() -> Path:
     return Path("./reviews.sqlite")
 
 
-_REVIEWS_DB_PATH = Path(os.environ.get("REVIEWS_DB_PATH", str(_default_db_path())))
+# All path resolution flows through ``_db_path()`` below so the env var is
+# evaluated at call time (Docker volume mount happens after module import).
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS pending_reviews (

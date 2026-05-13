@@ -104,10 +104,34 @@ async def submit_review(
 
     # The graph either completes (final present) or pauses again (interrupt).
     if "final" not in result_state:
-        # Re-pause: keep the row open so a follow-up POST is possible.
+        # Re-pause: insert a NEW pending_reviews row with the new interrupt
+        # payload (PRD §5.3 — re-pause produces a new extraction_id) and mark
+        # the prior row resolved so it doesn't show up as a stale duplicate.
+        # Surface the new id to the caller via a 409 response detail so the
+        # frontend can re-fetch /review/{new_extraction_id}.
+        from uuid import uuid4
+
+        interrupts: Any = result_state.get("__interrupt__", [])
+        new_payload: dict[str, Any] = (
+            interrupts[0].value if interrupts and hasattr(interrupts[0], "value") else {}
+        )
+        new_extraction_id = str(uuid4())
+        reviews.insert_pending(
+            extraction_id=new_extraction_id,
+            thread_id=thread_id,
+            statement_sha256=row["statement_sha256"],
+            suspect_count=len(new_payload.get("suspects", [])),
+            reason=new_payload.get("reason"),
+            review_payload=new_payload,
+        )
+        reviews.mark_resolved(extraction_id)
         raise HTTPException(
             status_code=409,
-            detail="graph re-paused after resume; corrections did not finalise",
+            detail={
+                "message": "graph re-paused after resume",
+                "new_extraction_id": new_extraction_id,
+                "reason": new_payload.get("reason"),
+            },
         )
 
     reviews.mark_resolved(extraction_id)
