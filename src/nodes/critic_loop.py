@@ -46,7 +46,7 @@ class CriticHint(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Recoverable exception tuple (rule: no bare except)
+# Recoverable exception tuple — specific types only, no bare except.
 # ---------------------------------------------------------------------------
 
 _RECOVERABLE = (

@@ -2,10 +2,10 @@
 
 Contract
 --------
-- ``file``: required ``UploadFile`` (application/pdf or application/x-pdf, ≤ 25 MB).
+- ``file``: required ``UploadFile`` (application/pdf or application/x-pdf, ≤ 80 MB).
 - ``ocr_text``: optional ``UploadFile`` (text/plain, ≤ 5 MB).
 - Returns ``ExtractResult`` JSON on success (HTTP 200).
-- 413 when the PDF body exceeds 25 MB.
+- 413 when the PDF body exceeds 80 MB.
 - 415 when the content-type is not a PDF MIME type.
 - 422 when the graph raises ``RuntimeError("ingest: PDF unreadable …")``.
 - 500 for all other unhandled exceptions (FastAPI default handler).
@@ -112,7 +112,7 @@ def _delete_file(path: str) -> None:
 async def extract(
     request: Request,
     background_tasks: BackgroundTasks,
-    file: Annotated[UploadFile, File(description="Bank statement PDF (≤ 25 MB)")],
+    file: Annotated[UploadFile, File(description="Bank statement PDF (≤ 80 MB)")],
     ocr_text: Annotated[
         UploadFile | None,
         File(description="Optional companion OCR text file (≤ 5 MB)"),

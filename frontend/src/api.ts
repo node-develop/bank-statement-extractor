@@ -49,7 +49,7 @@ function buildApiError(status: number, body: string): ApiError {
 /**
  * POST multipart form to /extract.
  *
- * @param pdfFile  - Required bank-statement PDF (≤ 25 MB).
+ * @param pdfFile  - Required bank-statement PDF (≤ 80 MB).
  * @param ocrFile  - Optional companion OCR text file (≤ 5 MB).
  * @throws {ApiError} on any non-2xx response.
  */
@@ -210,7 +210,7 @@ function fold(prev: ExtractionProgress, ev: StreamEvent): ExtractionProgress {
  * POST multipart to /extract/stream, parse SSE, accumulate progress.
  *
  * - On 404, falls back to the JSON /extract endpoint (graceful degradation
- *   when the backend hasn't shipped Phase 4 yet — log only).
+ *   when /extract/stream is not available — log only).
  * - Calls onProgress on every accumulator update.
  * - Returns when a kind:"result" event arrives, or throws ApiError on
  *   protocol violation / kind:"error".

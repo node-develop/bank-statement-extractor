@@ -9,10 +9,8 @@
   holders "Mr H and Mrs E Smith"; sort code printed as `00-00-00`; account
   number `12345678`; bank labelled "Big Bank" (anonymised). No real PII.
 - **Provenance note:** WebFetch returned valid `%PDF-1.5` bytes (1.3 MB,
-  3 pages — first page captured for the etalon below). Binary cached at
-  `/Users/izual/.claude/projects/-Users-izual-PycharmProjects-bank-statement-analizer/f5780384-bd3b-4b0a-b02f-50506b3d93ea/tool-results/webfetch-1778637260591-m0lfea.pdf`;
-  agent sandbox blocked file copy out of cache. Re-download manually with the
-  URL above.
+  3 pages — first page captured for the etalon below).
+  Re-download manually with the URL above.
 
 ## Layout summary
 
@@ -24,8 +22,7 @@ number; (3) columns labelled `Money out / Money in / Balance` (US samples use
 `Withdrawals / Deposits / Balance` or `Debits / Credits / Balance`);
 (4) explicit `PYMNTtype` column with UK transaction codes (`BGC`, `DEB`, `DD`,
 `FPI`, `CPT`) — extractor must classify these into deposit vs withdrawal by
-sign of the balance delta (which aligns with the rule already documented in
-`docs/architecture.md` "Domain invariants" item 1); (5) coloured-bullet
+sign of the balance delta (assign deposit vs withdrawal by the sign of the running-balance delta); (5) coloured-bullet
 annotations in the body explaining which pensions flow to which person —
 purely visual, the extractor should treat them as decoration; (6) **GBP £**
 currency (though the statement omits the `£` glyph from the raw text — the
@@ -50,5 +47,4 @@ Counts and totals are not surfaced on page 1; page 1 carries ~45 transaction
 rows split across `Money in` (BGC pension credits + occasional FPI) and
 `Money out` (DEB Tesco / Greggs / Amazon, DD utilities, CPT Link Tesco ATM).
 A full etalon requires downloading and OCRing pages 2 and 3 to obtain the
-closing balance and the bank's own summary totals — defer to the `evaluator`
-subagent when the sample.pdf is staged in this directory.
+closing balance and the bank's own summary totals — defer to the evaluator script once `sample.pdf` is staged in this directory.

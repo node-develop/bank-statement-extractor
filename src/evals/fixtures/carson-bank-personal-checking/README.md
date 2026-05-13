@@ -9,10 +9,8 @@
   "JOHN TEST / 123 TEST / YOUR CITY, KS 03087"; statement date "July 31, 20XX"
   (year placeholder). No real PII or signatures.
 - **Provenance note:** WebFetch returned valid `%PDF-1.7` bytes (821 KB,
-  6 pages). Binary cached at
-  `/Users/izual/.claude/projects/-Users-izual-PycharmProjects-bank-statement-analizer/f5780384-bd3b-4b0a-b02f-50506b3d93ea/tool-results/webfetch-1778637259075-21ja12.pdf`;
-  agent sandbox blocked file copy out of cache. Re-download manually with the
-  URL above.
+  6 pages).
+  Re-download manually with the URL above.
 
 ## Layout summary
 
