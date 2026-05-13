@@ -188,7 +188,13 @@ def _invoke_llm(chunk: PeriodChunk, text: str) -> dict[str, Any]:
     invoke_result: Any = llm_with_output.invoke([system, user])
     if isinstance(invoke_result, dict):
         raw_msg = invoke_result.get("raw")
-        raw_result: _TransactionList = invoke_result.get("parsed")  # type: ignore[assignment]
+        raw_result: _TransactionList | None = invoke_result.get("parsed")
+        parsing_error = invoke_result.get("parsing_error")
+        if raw_result is None:
+            raise ValueError(
+                f"extract_transactions: structured-output parsed=None "
+                f"(parsing_error={parsing_error!r})"
+            )
     else:
         raw_msg = None
         raw_result = invoke_result

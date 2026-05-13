@@ -144,7 +144,12 @@ def _invoke_llm(chunk: PeriodChunk, text: str) -> dict[str, Any]:
     invoke_result: Any = llm_with_output.invoke([system, user])
     if isinstance(invoke_result, dict):
         raw_msg = invoke_result.get("raw")
-        raw_result: LayoutLabel = invoke_result.get("parsed")  # type: ignore[assignment]
+        raw_result: LayoutLabel | None = invoke_result.get("parsed")
+        parsing_error = invoke_result.get("parsing_error")
+        if raw_result is None:
+            raise ValueError(
+                f"classify_layout: structured-output parsed=None (parsing_error={parsing_error!r})"
+            )
     else:
         raw_msg = None
         raw_result = invoke_result
