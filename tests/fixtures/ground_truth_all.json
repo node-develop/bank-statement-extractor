@@ -1,0 +1,844 @@
+{
+  "stmt_01_apex_chase": {
+    "id": "stmt_01_apex_chase",
+    "quality_level": "clean_digital",
+    "bank": {
+      "name": "JPMorgan Chase Bank, N.A.",
+      "short_name": "Chase",
+      "address": "P.O. Box 182051, Columbus, OH 43218-2051",
+      "phone": "1-800-242-7338",
+      "website": "Chase.com/BusinessOnline"
+    },
+    "account_holder": {
+      "name": "APEX LOGISTICS LLC",
+      "address_line_1": "4521 INDUSTRIAL PKWY",
+      "address_line_2": "HOUSTON TX 77032-1184"
+    },
+    "account": {
+      "type": "Chase Business Complete Checking",
+      "number_masked": "****8421",
+      "number_last4": "8421"
+    },
+    "period": {
+      "start": "2026-04-01",
+      "end": "2026-04-30",
+      "label": "April 01, 2026 through April 30, 2026"
+    },
+    "summary": {
+      "opening_balance": 48762.34,
+      "deposits_credits": 110850.55,
+      "withdrawals_debits": 86438.17,
+      "ending_balance": 73174.72
+    },
+    "transactions": [
+      {
+        "date": "2026-04-01",
+        "description": "ACH CREDIT STRIPE TRANSFER ST-V8K2H4M1 APEX LOGISTICS",
+        "amount": 18420.55,
+        "type": "credit",
+        "running_balance": 67182.89
+      },
+      {
+        "date": "2026-04-02",
+        "description": "DEPOSIT REMOTE ONLINE DEPOSIT REF #4421",
+        "amount": 12500.0,
+        "type": "credit",
+        "running_balance": 79682.89
+      },
+      {
+        "date": "2026-04-03",
+        "description": "ACH DEBIT COMDATA FLEET PAYMENT ACCT 88241",
+        "amount": -8214.33,
+        "type": "debit",
+        "running_balance": 71468.56
+      },
+      {
+        "date": "2026-04-05",
+        "description": "WIRE TRANSFER OUT PEAK FREIGHT CARRIERS LLC",
+        "amount": -15000.0,
+        "type": "debit",
+        "running_balance": 56468.56
+      },
+      {
+        "date": "2026-04-07",
+        "description": "ACH CREDIT NORTH RIDGE DISTRIBUTION INV 20264",
+        "amount": 22150.0,
+        "type": "credit",
+        "running_balance": 78618.56
+      },
+      {
+        "date": "2026-04-08",
+        "description": "CARD PURCHASE PILOT TRAVEL CENTER #382 DALLAS TX",
+        "amount": -642.18,
+        "type": "debit",
+        "running_balance": 77976.38
+      },
+      {
+        "date": "2026-04-10",
+        "description": "ACH DEBIT ADP PAYROLL FEES CO ID 9333000001",
+        "amount": -18742.5,
+        "type": "debit",
+        "running_balance": 59233.88
+      },
+      {
+        "date": "2026-04-13",
+        "description": "ZELLE TRANSFER FROM HORIZON SHIPPING INC",
+        "amount": 8750.0,
+        "type": "credit",
+        "running_balance": 67983.88
+      },
+      {
+        "date": "2026-04-14",
+        "description": "ACH DEBIT PROGRESSIVE COMMERCIAL POLICY 4421882",
+        "amount": -3284.71,
+        "type": "debit",
+        "running_balance": 64699.17
+      },
+      {
+        "date": "2026-04-16",
+        "description": "DEPOSIT CHECK #4128",
+        "amount": 31250.0,
+        "type": "credit",
+        "running_balance": 95949.17
+      },
+      {
+        "date": "2026-04-17",
+        "description": "WIRE TRANSFER OUT WESTERN FREIGHTLINER INVOICE 88291",
+        "amount": -24500.0,
+        "type": "debit",
+        "running_balance": 71449.17
+      },
+      {
+        "date": "2026-04-20",
+        "description": "CARD PURCHASE AMAZON.COM AMZN.COM/BILL WA",
+        "amount": -487.92,
+        "type": "debit",
+        "running_balance": 70961.25
+      },
+      {
+        "date": "2026-04-22",
+        "description": "ACH CREDIT BLUE HARBOR LOGISTICS AP-77241",
+        "amount": 17780.0,
+        "type": "credit",
+        "running_balance": 88741.25
+      },
+      {
+        "date": "2026-04-23",
+        "description": "ACH DEBIT THE HARTFORD INSURANCE CO ID 1063000001",
+        "amount": -2168.0,
+        "type": "debit",
+        "running_balance": 86573.25
+      },
+      {
+        "date": "2026-04-27",
+        "description": "BOOK TRANSFER TO SAVINGS ****2189",
+        "amount": -10000.0,
+        "type": "debit",
+        "running_balance": 76573.25
+      },
+      {
+        "date": "2026-04-28",
+        "description": "ACH DEBIT T-MOBILE FOR BUSINESS ACCT 887412",
+        "amount": -528.41,
+        "type": "debit",
+        "running_balance": 76044.84
+      },
+      {
+        "date": "2026-04-29",
+        "description": "ACH DEBIT XPO LOGISTICS INVOICE 4421",
+        "amount": -2845.12,
+        "type": "debit",
+        "running_balance": 73199.72
+      },
+      {
+        "date": "2026-04-30",
+        "description": "MONTHLY SERVICE FEE",
+        "amount": -25.0,
+        "type": "debit",
+        "running_balance": 73174.72
+      }
+    ]
+  },
+  "stmt_02_riverstone_bofa": {
+    "id": "stmt_02_riverstone_bofa",
+    "quality_level": "clean_digital_multipage",
+    "bank": {
+      "name": "Bank of America, N.A.",
+      "short_name": "Bank of America",
+      "address": "P.O. Box 25118, Tampa, FL 33622-5118",
+      "phone": "1.888.BUSINESS (1.888.287.4637)",
+      "website": "bankofamerica.com/smallbusiness"
+    },
+    "account_holder": {
+      "name": "RIVERSTONE CONSULTING GROUP INC",
+      "address_line_1": "218 MARKET ST STE 410",
+      "address_line_2": "SAN FRANCISCO CA 94105-2740"
+    },
+    "account": {
+      "type": "Business Advantage Banking",
+      "number_masked": "****5938",
+      "number_last4": "5938"
+    },
+    "period": {
+      "start": "2026-03-01",
+      "end": "2026-03-31",
+      "label": "March 1, 2026 to March 31, 2026"
+    },
+    "summary": {
+      "opening_balance": 127845.92,
+      "deposits_credits": 285003.34,
+      "withdrawals_debits": 219950.79,
+      "ending_balance": 192898.47
+    },
+    "transactions": [
+      {
+        "date": "2026-03-02",
+        "description": "WIRE TYPE: WIRE IN DATE: 260302 FROM: ALDER MEDIA HOLDINGS",
+        "amount": 48500.0,
+        "type": "credit",
+        "running_balance": 176345.92
+      },
+      {
+        "date": "2026-03-03",
+        "description": "ONLINE PMT TO: AMERICAN EXPRESS XXXX-71208",
+        "amount": -12846.22,
+        "type": "debit",
+        "running_balance": 163499.7
+      },
+      {
+        "date": "2026-03-04",
+        "description": "ACH HOLD ADP PAYROLL FEES PPD ID: 9333000001",
+        "amount": -185.0,
+        "type": "debit",
+        "running_balance": 163314.7
+      },
+      {
+        "date": "2026-03-04",
+        "description": "ACH DEBIT ADP TX/FIN SVC TRANS ID 0044128821",
+        "amount": -42180.55,
+        "type": "debit",
+        "running_balance": 121134.15
+      },
+      {
+        "date": "2026-03-05",
+        "description": "ACH CREDIT NORTHWIND CAPITAL PARTNERS INVOICE 2026-014",
+        "amount": 32450.0,
+        "type": "credit",
+        "running_balance": 153584.15
+      },
+      {
+        "date": "2026-03-06",
+        "description": "ZELLE PAYMENT TO ELENA MARTINEZ CONFIRMATION:4A2B19",
+        "amount": -3200.0,
+        "type": "debit",
+        "running_balance": 150384.15
+      },
+      {
+        "date": "2026-03-09",
+        "description": "PURCHASE 0307 AWS AMAZON WEB SVC AWS.AMAZON.CO WA",
+        "amount": -8421.3,
+        "type": "debit",
+        "running_balance": 141962.85
+      },
+      {
+        "date": "2026-03-10",
+        "description": "WIRE TYPE: WIRE IN DATE: 260310 FROM: GRANITE PEAK ENTERPRI\u2026",
+        "amount": 62100.0,
+        "type": "credit",
+        "running_balance": 204062.85
+      },
+      {
+        "date": "2026-03-11",
+        "description": "CHECK 1284",
+        "amount": -18500.0,
+        "type": "debit",
+        "running_balance": 185562.85
+      },
+      {
+        "date": "2026-03-12",
+        "description": "ACH CREDIT KESTREL ANALYTICS PMT REF 88241",
+        "amount": 14750.0,
+        "type": "credit",
+        "running_balance": 200312.85
+      },
+      {
+        "date": "2026-03-13",
+        "description": "ONLINE PMT TO: WEWORK INC SUITE F410",
+        "amount": -22480.0,
+        "type": "debit",
+        "running_balance": 177832.85
+      },
+      {
+        "date": "2026-03-16",
+        "description": "PURCHASE 0314 DELTA AIR LINES 0061872 ATLANTA GA",
+        "amount": -2845.6,
+        "type": "debit",
+        "running_balance": 174987.25
+      },
+      {
+        "date": "2026-03-17",
+        "description": "ACH DEBIT ADP PAYROLL FEES PPD ID: 9333000001",
+        "amount": -42180.55,
+        "type": "debit",
+        "running_balance": 132806.7
+      },
+      {
+        "date": "2026-03-18",
+        "description": "ACH CREDIT HEMLOCK TRADING CO PAYMENT 884-12",
+        "amount": 27600.0,
+        "type": "credit",
+        "running_balance": 160406.7
+      },
+      {
+        "date": "2026-03-19",
+        "description": "PURCHASE 0317 ANTHROPIC PBC API USAGE SF CA",
+        "amount": -1842.45,
+        "type": "debit",
+        "running_balance": 158564.25
+      },
+      {
+        "date": "2026-03-20",
+        "description": "PURCHASE 0318 GOOGLE WORKSPACE GSUITE_REC MOUNTAIN VIEW",
+        "amount": -380.0,
+        "type": "debit",
+        "running_balance": 158184.25
+      },
+      {
+        "date": "2026-03-23",
+        "description": "WIRE TYPE: WIRE OUT DATE: 260323 TO: PRINCIPLE LAW LLP",
+        "amount": -28500.0,
+        "type": "debit",
+        "running_balance": 129684.25
+      },
+      {
+        "date": "2026-03-23",
+        "description": "WIRE TRANSFER FEE",
+        "amount": -30.0,
+        "type": "debit",
+        "running_balance": 129654.25
+      },
+      {
+        "date": "2026-03-24",
+        "description": "ACH CREDIT ASCENT ROBOTICS INC INVOICE 884-22",
+        "amount": 41250.0,
+        "type": "credit",
+        "running_balance": 170904.25
+      },
+      {
+        "date": "2026-03-25",
+        "description": "ONLINE PMT TO: PG&E WEB ACCT 4421887",
+        "amount": -1248.92,
+        "type": "debit",
+        "running_balance": 169655.33
+      },
+      {
+        "date": "2026-03-26",
+        "description": "DEPOSIT BUSINESS BANKING",
+        "amount": 22416.4,
+        "type": "credit",
+        "running_balance": 192071.73
+      },
+      {
+        "date": "2026-03-27",
+        "description": "ACH DEBIT PRINCIPAL FINANCIAL 401K CONTRIB 884",
+        "amount": -8420.0,
+        "type": "debit",
+        "running_balance": 183651.73
+      },
+      {
+        "date": "2026-03-30",
+        "description": "WIRE TYPE: WIRE IN DATE: 260330 FROM: VANTAGE DIGITAL CORP",
+        "amount": 35450.0,
+        "type": "credit",
+        "running_balance": 219101.73
+      },
+      {
+        "date": "2026-03-31",
+        "description": "ONLINE PMT TO: STATE OF CALIFORNIA EDD",
+        "amount": -12480.0,
+        "type": "debit",
+        "running_balance": 206621.73
+      },
+      {
+        "date": "2026-03-31",
+        "description": "ACH DEBIT GUSTO PAYROLL BUSINESS-001",
+        "amount": -14185.2,
+        "type": "debit",
+        "running_balance": 192436.53
+      },
+      {
+        "date": "2026-03-31",
+        "description": "INTEREST EARNED",
+        "amount": 486.94,
+        "type": "credit",
+        "running_balance": 192923.47
+      },
+      {
+        "date": "2026-03-31",
+        "description": "MONTHLY MAINTENANCE FEE",
+        "amount": -25.0,
+        "type": "debit",
+        "running_balance": 192898.47
+      }
+    ]
+  },
+  "stmt_03_greenfield_wellsfargo": {
+    "id": "stmt_03_greenfield_wellsfargo",
+    "quality_level": "scanned_clean",
+    "bank": {
+      "name": "Wells Fargo Bank, N.A.",
+      "short_name": "Wells Fargo",
+      "address": "P.O. Box 6995, Portland, OR 97228-6995",
+      "phone": "1-800-CALL-WELLS (1-800-225-5935)",
+      "website": "wellsfargo.com/biz"
+    },
+    "account_holder": {
+      "name": "GREENFIELD MANUFACTURING CO",
+      "address_line_1": "1847 COMMERCE WAY",
+      "address_line_2": "CHARLOTTE NC 28208-3915"
+    },
+    "account": {
+      "type": "Initiate Business Checking",
+      "number_masked": "****2076",
+      "number_last4": "2076"
+    },
+    "period": {
+      "start": "2026-02-01",
+      "end": "2026-02-28",
+      "label": "February 1, 2026 - February 28, 2026"
+    },
+    "summary": {
+      "opening_balance": 34521.18,
+      "deposits_credits": 78420.55,
+      "withdrawals_debits": 71283.4,
+      "ending_balance": 41658.33
+    },
+    "transactions": [
+      {
+        "date": "2026-02-02",
+        "description": "DEPOSITED CHECK REF# 8841 ON 02/02",
+        "amount": 14250.0,
+        "type": "credit",
+        "running_balance": 48771.18
+      },
+      {
+        "date": "2026-02-04",
+        "description": "EFT WITHDRAWAL TO MIDWEST STEEL SUPPLY CO",
+        "amount": -18420.0,
+        "type": "debit",
+        "running_balance": 30351.18
+      },
+      {
+        "date": "2026-02-06",
+        "description": "ACH CREDIT BLUE RIDGE INDUSTRIAL PMT REF 88241",
+        "amount": 22150.55,
+        "type": "credit",
+        "running_balance": 52501.73
+      },
+      {
+        "date": "2026-02-09",
+        "description": "PAYROLL ADP TX/FIN SVC 020926 002264",
+        "amount": -15842.8,
+        "type": "debit",
+        "running_balance": 36658.93
+      },
+      {
+        "date": "2026-02-11",
+        "description": "PURCHASE AUTHORIZED 02/10 GRAINGER 800-472-4643 IL",
+        "amount": -2418.45,
+        "type": "debit",
+        "running_balance": 34240.48
+      },
+      {
+        "date": "2026-02-13",
+        "description": "DEPOSITED CHECK REF# 8842 ON 02/13",
+        "amount": 18500.0,
+        "type": "credit",
+        "running_balance": 52740.48
+      },
+      {
+        "date": "2026-02-17",
+        "description": "EFT WITHDRAWAL TO DUKE ENERGY CAROLINAS LLC",
+        "amount": -3845.2,
+        "type": "debit",
+        "running_balance": 48895.28
+      },
+      {
+        "date": "2026-02-18",
+        "description": "ACH CREDIT TIDEWATER COMPONENTS INC INV 4421",
+        "amount": 12420.0,
+        "type": "credit",
+        "running_balance": 61315.28
+      },
+      {
+        "date": "2026-02-20",
+        "description": "PURCHASE AUTHORIZED 02/19 SHELL OIL 5743 CHARLOTTE NC",
+        "amount": -485.3,
+        "type": "debit",
+        "running_balance": 60829.98
+      },
+      {
+        "date": "2026-02-23",
+        "description": "EFT WITHDRAWAL TO STATE OF NC DEPT OF REVENUE",
+        "amount": -8420.55,
+        "type": "debit",
+        "running_balance": 52409.43
+      },
+      {
+        "date": "2026-02-24",
+        "description": "PAYROLL ADP TX/FIN SVC 022426 002264",
+        "amount": -15842.8,
+        "type": "debit",
+        "running_balance": 36566.63
+      },
+      {
+        "date": "2026-02-25",
+        "description": "ACH CREDIT MERIDIAN FABRICATION PMT 884-08",
+        "amount": 11100.0,
+        "type": "credit",
+        "running_balance": 47666.63
+      },
+      {
+        "date": "2026-02-27",
+        "description": "EFT WITHDRAWAL TO CINTAS CORP NO 2 LBX 631025",
+        "amount": -1185.3,
+        "type": "debit",
+        "running_balance": 46481.33
+      },
+      {
+        "date": "2026-02-27",
+        "description": "EFT WITHDRAWAL TO VERIZON BUSINESS WIRELESS",
+        "amount": -823.0,
+        "type": "debit",
+        "running_balance": 45658.33
+      },
+      {
+        "date": "2026-02-28",
+        "description": "MONTHLY SERVICE FEE",
+        "amount": -10.0,
+        "type": "debit",
+        "running_balance": 45648.33
+      },
+      {
+        "date": "2026-02-28",
+        "description": "ANALYSIS SERVICE CHARGE",
+        "amount": -990.0,
+        "type": "debit",
+        "running_balance": 44658.33
+      },
+      {
+        "date": "2026-02-28",
+        "description": "EFT WITHDRAWAL TO PIEDMONT NATURAL GAS",
+        "amount": -3000.0,
+        "type": "debit",
+        "running_balance": 41658.33
+      }
+    ]
+  },
+  "stmt_04_mountainpeak_pnc": {
+    "id": "stmt_04_mountainpeak_pnc",
+    "quality_level": "scanned_low_quality",
+    "bank": {
+      "name": "PNC Bank, National Association",
+      "short_name": "PNC Bank",
+      "address": "P.O. Box 609, Pittsburgh, PA 15230-9738",
+      "phone": "1-877-BUS-BNKG (1-877-287-2654)",
+      "website": "pnc.com/business"
+    },
+    "account_holder": {
+      "name": "MOUNTAIN PEAK CONSTRUCTION LLC",
+      "address_line_1": "932 PINE RIDGE RD",
+      "address_line_2": "DENVER CO 80205-4127"
+    },
+    "account": {
+      "type": "Business Checking Plus",
+      "number_masked": "****4163",
+      "number_last4": "4163"
+    },
+    "period": {
+      "start": "2026-01-01",
+      "end": "2026-01-31",
+      "label": "01/01/2026 to 01/31/2026"
+    },
+    "summary": {
+      "opening_balance": 18492.07,
+      "deposits_credits": 96340.0,
+      "withdrawals_debits": 78214.55,
+      "ending_balance": 36617.52
+    },
+    "transactions": [
+      {
+        "date": "2026-01-03",
+        "description": "DEPOSIT - CUSTOMER CHECK #20641",
+        "amount": 42500.0,
+        "type": "credit",
+        "running_balance": 60992.07
+      },
+      {
+        "date": "2026-01-05",
+        "description": "ACH WITHDRAWAL - HOME DEPOT PRO XTRA ACCT 88241",
+        "amount": -8420.3,
+        "type": "debit",
+        "running_balance": 52571.77
+      },
+      {
+        "date": "2026-01-07",
+        "description": "ACH WITHDRAWAL - UNITED RENTALS NORTH AMERICA",
+        "amount": -6184.55,
+        "type": "debit",
+        "running_balance": 46387.22
+      },
+      {
+        "date": "2026-01-12",
+        "description": "PAYROLL - PAYCHEX EIB INVOICE",
+        "amount": -18742.0,
+        "type": "debit",
+        "running_balance": 27645.22
+      },
+      {
+        "date": "2026-01-14",
+        "description": "DEPOSIT - WIRE FROM SUMMIT DEVELOPMENT INC",
+        "amount": 28450.0,
+        "type": "credit",
+        "running_balance": 56095.22
+      },
+      {
+        "date": "2026-01-16",
+        "description": "ACH WITHDRAWAL - SUNBELT RENTALS INC ACCT 4421",
+        "amount": -4180.2,
+        "type": "debit",
+        "running_balance": 51915.02
+      },
+      {
+        "date": "2026-01-19",
+        "description": "POS PURCHASE - VALERO #4421 DENVER CO",
+        "amount": -421.85,
+        "type": "debit",
+        "running_balance": 51493.17
+      },
+      {
+        "date": "2026-01-22",
+        "description": "ACH CREDIT - ALPINE BUILDERS GROUP PMT INV 88-22",
+        "amount": 15890.0,
+        "type": "credit",
+        "running_balance": 67383.17
+      },
+      {
+        "date": "2026-01-23",
+        "description": "PAYROLL - PAYCHEX EIB INVOICE",
+        "amount": -18742.0,
+        "type": "debit",
+        "running_balance": 48641.17
+      },
+      {
+        "date": "2026-01-27",
+        "description": "ACH WITHDRAWAL - XCEL ENERGY CO ACCT 887421",
+        "amount": -2842.5,
+        "type": "debit",
+        "running_balance": 45798.67
+      },
+      {
+        "date": "2026-01-28",
+        "description": "DEPOSIT - CUSTOMER CHECK #20642",
+        "amount": 9500.0,
+        "type": "credit",
+        "running_balance": 55298.67
+      },
+      {
+        "date": "2026-01-30",
+        "description": "ACH WITHDRAWAL - LIBERTY MUTUAL INS POLICY 4128",
+        "amount": -3812.15,
+        "type": "debit",
+        "running_balance": 51486.52
+      },
+      {
+        "date": "2026-01-30",
+        "description": "WIRE TRANSFER OUT - JENSEN ELECTRICAL SUBCONTRACTOR",
+        "amount": -14844.0,
+        "type": "debit",
+        "running_balance": 36642.52
+      },
+      {
+        "date": "2026-01-31",
+        "description": "MONTHLY SERVICE CHARGE",
+        "amount": -25.0,
+        "type": "debit",
+        "running_balance": 36617.52
+      }
+    ]
+  },
+  "stmt_05_aurora_firstpacific": {
+    "id": "stmt_05_aurora_firstpacific",
+    "quality_level": "scanned_degraded",
+    "bank": {
+      "name": "First Pacific Heritage Bank",
+      "short_name": "First Pacific Heritage",
+      "address": "1200 Ocean Blvd, Long Beach, CA 90802",
+      "phone": "(562) 555-0188",
+      "website": "firstpacificheritage.com"
+    },
+    "account_holder": {
+      "name": "AURORA PACIFIC TRADING INC",
+      "address_line_1": "6730 HARBOR BLVD",
+      "address_line_2": "LONG BEACH CA 90803-1742"
+    },
+    "account": {
+      "type": "Business Operating Account",
+      "number_masked": "****0589",
+      "number_last4": "0589"
+    },
+    "period": {
+      "start": "2025-12-01",
+      "end": "2025-12-31",
+      "label": "December 01, 2025 through December 31, 2025"
+    },
+    "summary": {
+      "opening_balance": 52834.45,
+      "deposits_credits": 138420.0,
+      "withdrawals_debits": 124583.27,
+      "ending_balance": 66671.18
+    },
+    "transactions": [
+      {
+        "date": "2025-12-02",
+        "description": "INCOMING WIRE - SHENZHEN GOLDEN PORT CO LTD",
+        "amount": 28450.0,
+        "type": "credit",
+        "running_balance": 81284.45
+      },
+      {
+        "date": "2025-12-03",
+        "description": "ACH PAYMENT - UPS FREIGHT BILL 88412",
+        "amount": -3845.2,
+        "type": "debit",
+        "running_balance": 77439.25
+      },
+      {
+        "date": "2025-12-04",
+        "description": "ACH PAYMENT - C.H. ROBINSON WORLDWIDE INC",
+        "amount": -8214.55,
+        "type": "debit",
+        "running_balance": 69224.7
+      },
+      {
+        "date": "2025-12-08",
+        "description": "ACH CREDIT - WESTBROOK DISTRIBUTION INC INV 4421",
+        "amount": 18420.0,
+        "type": "credit",
+        "running_balance": 87644.7
+      },
+      {
+        "date": "2025-12-09",
+        "description": "ACH PAYMENT - LIVINGSTON INTERNATIONAL CUSTOMS",
+        "amount": -4128.75,
+        "type": "debit",
+        "running_balance": 83515.95
+      },
+      {
+        "date": "2025-12-10",
+        "description": "CHECK 2841 - PROLOGIS INC RENT JAN",
+        "amount": -8500.0,
+        "type": "debit",
+        "running_balance": 75015.95
+      },
+      {
+        "date": "2025-12-12",
+        "description": "DEPOSIT - WIRE FROM YOKOHAMA TEXTILE GROUP",
+        "amount": 22150.0,
+        "type": "credit",
+        "running_balance": 97165.95
+      },
+      {
+        "date": "2025-12-15",
+        "description": "PAYROLL ACH - INTUIT QUICKBOOKS PAYROLL",
+        "amount": -16842.3,
+        "type": "debit",
+        "running_balance": 80323.65
+      },
+      {
+        "date": "2025-12-16",
+        "description": "ACH PAYMENT - FEDEX FREIGHT 884-22",
+        "amount": -5418.4,
+        "type": "debit",
+        "running_balance": 74905.25
+      },
+      {
+        "date": "2025-12-18",
+        "description": "INCOMING WIRE - PACIFIC RIM IMPORTERS LLC",
+        "amount": 31200.0,
+        "type": "credit",
+        "running_balance": 106105.25
+      },
+      {
+        "date": "2025-12-19",
+        "description": "ACH PAYMENT - AMERICAN EXPRESS CORP CARD 88241",
+        "amount": -22480.55,
+        "type": "debit",
+        "running_balance": 83624.7
+      },
+      {
+        "date": "2025-12-22",
+        "description": "ACH PAYMENT - ICE INDUSTRIAL EXCHANGE WAREHOUSE",
+        "amount": -6840.0,
+        "type": "debit",
+        "running_balance": 76784.7
+      },
+      {
+        "date": "2025-12-23",
+        "description": "ACH CREDIT - NEWBROOK TRADING CO PMT 88412",
+        "amount": 14250.0,
+        "type": "credit",
+        "running_balance": 91034.7
+      },
+      {
+        "date": "2025-12-26",
+        "description": "ACH PAYMENT - SOUTHERN CALIFORNIA EDISON",
+        "amount": -1284.3,
+        "type": "debit",
+        "running_balance": 89750.4
+      },
+      {
+        "date": "2025-12-29",
+        "description": "PAYROLL ACH - INTUIT QUICKBOOKS PAYROLL",
+        "amount": -16842.3,
+        "type": "debit",
+        "running_balance": 72908.1
+      },
+      {
+        "date": "2025-12-30",
+        "description": "ACH PAYMENT - HARTFORD MARINE INSURANCE POL 8841",
+        "amount": -4180.0,
+        "type": "debit",
+        "running_balance": 68728.1
+      },
+      {
+        "date": "2025-12-30",
+        "description": "DEPOSIT - CHECK #4128 NEWBROOK TRADING",
+        "amount": 23950.0,
+        "type": "credit",
+        "running_balance": 92678.1
+      },
+      {
+        "date": "2025-12-31",
+        "description": "WIRE TRANSFER OUT - GUANGZHOU SUPPLY HOLDINGS",
+        "amount": -25800.0,
+        "type": "debit",
+        "running_balance": 66878.1
+      },
+      {
+        "date": "2025-12-31",
+        "description": "WIRE TRANSFER FEE",
+        "amount": -45.0,
+        "type": "debit",
+        "running_balance": 66833.1
+      },
+      {
+        "date": "2025-12-31",
+        "description": "ANALYSIS SERVICE CHARGE",
+        "amount": -161.92,
+        "type": "debit",
+        "running_balance": 66671.18
+      }
+    ]
+  }
+}

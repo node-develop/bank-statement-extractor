@@ -1,163 +1,165 @@
 """Checkpointer factory for the bank-statement-analizer LangGraph pipeline.
 
-Usage (FastAPI lifespan)
-------------------------
-The preferred pattern for a long-lived service is to call
-``build_checkpointer()`` inside an ``asynccontextmanager`` lifespan and keep
-the returned saver alive for the duration of the process::
+Backends
+--------
+- ``sqlite`` (default) — ``SqliteSaver`` (sync) / ``AsyncSqliteSaver`` (async).
+  Single file on disk; perfect for local-dev and a small test deployment.
+- ``memory`` — ``InMemorySaver``; tests only.
 
-    from contextlib import asynccontextmanager
-    from src.graph.checkpointer import build_checkpointer
-
-    @asynccontextmanager
-    async def lifespan(app: FastAPI):
-        saver, teardown = build_checkpointer()
-        app.state.checkpointer = saver
-        yield
-        teardown()
+Why no Postgres? The Ixonia test task is single-tenant and the LangGraph
+checkpoint volume per extraction is small. SQLite with a persisted Docker
+volume covers the durability requirement; Postgres adds a second container
+without buying anything for this use case. A future deployment can swap
+backends here without touching graph or API code.
 
 Environment variables
 ---------------------
 ``LANGGRAPH_CHECKPOINTER``
-    ``"sqlite"`` (default) or ``"postgres"``.
+    ``"sqlite"`` (default) or ``"memory"``.
 
 ``LANGGRAPH_SQLITE_PATH``
-    Path to the SQLite database file.  Defaults to ``"./graph.sqlite"``.
-    Pass ``":memory:"`` for in-process ephemeral storage (tests).
-
-``DATABASE_URL``
-    Required when ``LANGGRAPH_CHECKPOINTER=postgres``.
-    Example: ``postgresql://user:pass@host:5432/dbname``.
+    Path to the SQLite database file. Defaults to ``"./graph.sqlite"``.
+    Pass ``":memory:"`` for in-process ephemeral storage.
 
 ``LANGGRAPH_STRICT_MSGPACK``
     When ``"true"`` (default), the SQLite saver rejects checkpoint payloads
-    that contain types not in the safe allow-list.  **Do not set to "false"
+    that contain types not in the safe allow-list. **Do not set to "false"
     in production** — it would allow arbitrary Python objects to be
-    deserialised from a user-controlled database row, which is a code-
-    execution risk.
+    deserialised from a user-controlled database row, which is a
+    code-execution risk.
 
-Security recommendation
------------------------
-Always leave ``LANGGRAPH_STRICT_MSGPACK=true`` (the default here).  The
-variable is read by the underlying ``langgraph-checkpoint-sqlite`` library;
-this module simply ensures the default is safe before the library reads it.
+API contract
+------------
+Two factories live here:
+
+- :func:`build_checkpointer` — synchronous; returns ``(saver, teardown)``.
+  Used by ``src/evals/run.py`` (CLI) and any non-async caller.
+- :func:`build_async_checkpointer` — asynchronous; returns
+  ``(saver, async_teardown)``. Used by ``src/api/main.py`` lifespan because
+  the FastAPI endpoint awaits ``graph.ainvoke(...)``, which calls
+  ``await checkpointer.aget_tuple(...)`` — only the ``aio`` variants
+  implement that.  (Confirmed by docs.langchain.com/oss/python/langgraph/add-memory.)
 """
 
 from __future__ import annotations
 
 import logging
 import os
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.checkpoint.sqlite import SqliteSaver
 
 logger = logging.getLogger(__name__)
 
-# Type alias for the teardown callable returned alongside the saver.
+# Type aliases for the teardown callables returned alongside the saver.
 _Teardown = Callable[[], None]
+_AsyncTeardown = Callable[[], Awaitable[None]]
 
 # Accepted values for LANGGRAPH_CHECKPOINTER
 _BACKEND_SQLITE = "sqlite"
-_BACKEND_POSTGRES = "postgres"
-_BACKEND_MEMORY = "memory"  # convenience for tests
+_BACKEND_MEMORY = "memory"
 
 
-def build_checkpointer() -> tuple[object, _Teardown]:
-    """Return ``(saver, teardown)`` for the configured checkpointer backend.
-
-    The ``saver`` is a fully initialised ``BaseCheckpointSaver`` ready to be
-    passed to ``StateGraph.compile(checkpointer=saver)``.
-
-    The ``teardown`` callable must be invoked when the application shuts down
-    (e.g. in the FastAPI lifespan ``finally`` block or the ``asynccontextmanager``
-    exit path).  For SQLite it closes the underlying connection; for Postgres it
-    exits the connection pool context manager.
-
-    Raises
-    ------
-    RuntimeError
-        If ``LANGGRAPH_CHECKPOINTER=postgres`` but ``DATABASE_URL`` is unset.
-    ValueError
-        If ``LANGGRAPH_CHECKPOINTER`` is set to an unrecognised value.
-    """
-    # Enforce safe msgpack serialisation BEFORE the library reads the env var.
+def _ensure_safe_msgpack() -> None:
+    """Default LANGGRAPH_STRICT_MSGPACK to ``true`` before any saver loads."""
     if not os.environ.get("LANGGRAPH_STRICT_MSGPACK"):
         os.environ["LANGGRAPH_STRICT_MSGPACK"] = "true"
         logger.debug("LANGGRAPH_STRICT_MSGPACK defaulted to 'true'")
 
-    backend = os.environ.get("LANGGRAPH_CHECKPOINTER", _BACKEND_SQLITE).lower()
+
+def _backend() -> str:
+    return os.environ.get("LANGGRAPH_CHECKPOINTER", _BACKEND_SQLITE).lower()
+
+
+def _sqlite_path() -> str:
+    return os.environ.get("LANGGRAPH_SQLITE_PATH", "./graph.sqlite")
+
+
+# ---------------------------------------------------------------------------
+# Sync factory — for CLI / tests
+# ---------------------------------------------------------------------------
+
+
+def build_checkpointer() -> tuple[object, _Teardown]:
+    """Return ``(saver, teardown)`` for the configured backend.
+
+    The ``teardown`` callable closes the underlying connection; invoke it
+    from the caller's ``finally`` block.
+
+    Raises
+    ------
+    ValueError
+        If ``LANGGRAPH_CHECKPOINTER`` is set to an unrecognised value.
+    """
+    _ensure_safe_msgpack()
+    backend = _backend()
 
     if backend == _BACKEND_MEMORY:
-        saver = InMemorySaver()
-        return saver, lambda: None
+        return InMemorySaver(), lambda: None
 
     if backend == _BACKEND_SQLITE:
-        return _build_sqlite()
+        db_path = _sqlite_path()
+        logger.info("Building SQLite checkpointer at %s", db_path)
+        cm = SqliteSaver.from_conn_string(db_path)
+        saver = cm.__enter__()
 
-    if backend == _BACKEND_POSTGRES:
-        return _build_postgres()
+        def _teardown() -> None:
+            logger.info("Closing SQLite checkpointer connection (%s)", db_path)
+            cm.__exit__(None, None, None)
+
+        return saver, _teardown
 
     raise ValueError(
         f"Unrecognised LANGGRAPH_CHECKPOINTER value: {backend!r}. "
-        f"Expected one of: {_BACKEND_SQLITE!r}, {_BACKEND_POSTGRES!r}, "
-        f"{_BACKEND_MEMORY!r}."
+        f"Expected one of: {_BACKEND_SQLITE!r}, {_BACKEND_MEMORY!r}."
     )
 
 
-def _build_sqlite() -> tuple[SqliteSaver, _Teardown]:
-    """Construct a long-lived ``SqliteSaver`` via the documented public API.
+# ---------------------------------------------------------------------------
+# Async factory — for FastAPI lifespan
+# ---------------------------------------------------------------------------
 
-    ``SqliteSaver.from_conn_string`` is the public factory confirmed by
-    context7 docs (reference.langchain.com/python/langgraph/checkpoints).
-    We call ``__enter__`` / ``__exit__`` explicitly so the FastAPI lifespan
-    controls the connection lifetime — identical pattern to ``_build_postgres``.
-    Works for both ``":memory:"`` (tests) and file paths.
+
+async def build_async_checkpointer() -> tuple[object, _AsyncTeardown]:
+    """Return ``(saver, async_teardown)`` for the configured backend (async).
+
+    The sync ``SqliteSaver`` does not implement ``aget_tuple``, so the
+    async ``graph.ainvoke(...)`` in the /extract endpoint would fail on
+    the first checkpoint read against it.  ``AsyncSqliteSaver`` from the
+    ``aio`` submodule is the documented async-compatible variant
+    (docs.langchain.com/oss/python/langgraph/add-memory).
+
+    Raises
+    ------
+    ValueError
+        If ``LANGGRAPH_CHECKPOINTER`` is set to an unrecognised value.
     """
-    db_path = os.environ.get("LANGGRAPH_SQLITE_PATH", "./graph.sqlite")
-    logger.info("Building SQLite checkpointer at %s", db_path)
+    _ensure_safe_msgpack()
+    backend = _backend()
 
-    cm = SqliteSaver.from_conn_string(db_path)
-    saver = cm.__enter__()
+    if backend == _BACKEND_MEMORY:
 
-    def teardown() -> None:
-        logger.info("Closing SQLite checkpointer connection (%s)", db_path)
-        cm.__exit__(None, None, None)
+        async def _noop() -> None:
+            return None
 
-    return saver, teardown
+        return InMemorySaver(), _noop
 
+    if backend == _BACKEND_SQLITE:
+        from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
-def _build_postgres() -> tuple[object, _Teardown]:
-    """Construct a ``PostgresSaver`` from ``DATABASE_URL``.
+        db_path = _sqlite_path()
+        logger.info("Building async SQLite checkpointer at %s", db_path)
+        cm = AsyncSqliteSaver.from_conn_string(db_path)
+        sqlite_saver = await cm.__aenter__()
 
-    The optional ``langgraph-checkpoint-postgres`` extra must be installed::
+        async def _teardown() -> None:
+            logger.info("Closing async SQLite checkpointer connection (%s)", db_path)
+            await cm.__aexit__(None, None, None)
 
-        uv sync --extra postgres
+        return sqlite_saver, _teardown
 
-    We enter the context manager explicitly and return a teardown that exits
-    it, giving the FastAPI lifespan full control over the connection lifetime.
-    """
-    try:
-        from langgraph.checkpoint.postgres import (
-            PostgresSaver,  # type: ignore[import-not-found,unused-ignore]
-        )
-    except ImportError as exc:
-        raise ImportError("PostgresSaver is not installed. Run: uv sync --extra postgres") from exc
-
-    db_url = os.environ.get("DATABASE_URL")
-    if not db_url:
-        raise RuntimeError("LANGGRAPH_CHECKPOINTER=postgres requires DATABASE_URL to be set.")
-
-    logger.info("Building Postgres checkpointer (DATABASE_URL is set)")
-    cm = PostgresSaver.from_conn_string(db_url)
-    saver = cm.__enter__()
-    # setup() runs schema migrations (CREATE TABLE IF NOT EXISTS checkpoints …).
-    # Must be called before graph.invoke(); confirmed by context7 docs at
-    # reference.langchain.com/python/langgraph/checkpoints.
-    saver.setup()
-
-    def teardown() -> None:
-        logger.info("Closing Postgres checkpointer connection")
-        cm.__exit__(None, None, None)
-
-    return saver, teardown
+    raise ValueError(
+        f"Unrecognised LANGGRAPH_CHECKPOINTER value: {backend!r}. "
+        f"Expected one of: {_BACKEND_SQLITE!r}, {_BACKEND_MEMORY!r}."
+    )

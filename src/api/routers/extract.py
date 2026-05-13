@@ -158,6 +158,9 @@ async def extract(
     logger.info("extract: invoking graph thread_id=%s sha256=%s…", thread_id, digest[:16])
 
     try:
+        # The lifespan wires an Async{Postgres,Sqlite}Saver into the graph
+        # (see src/graph/checkpointer.py:build_async_checkpointer), so
+        # ainvoke() can issue real await calls on the checkpointer.
         result_state: dict[str, object] = await graph.ainvoke(initial_state, config=config)
     except RuntimeError as exc:
         if "ingest: PDF unreadable" in str(exc):

@@ -37,14 +37,15 @@ WORKDIR /app
 # while still making them visible to uv.
 # --no-install-project skips installing the src/ package itself so this
 # layer is invalidated only when deps change, not on every source edit.
-# --extra postgres pulls langgraph-checkpoint-postgres + psycopg[binary].
 # --no-dev excludes ruff, mypy, pytest from the runtime image.
 # --frozen = fail the build if uv.lock is out of date (rule 4).
+# No extras: SQLite + aiosqlite ship via langgraph-checkpoint-sqlite which
+# is a core (non-optional) dependency in pyproject.toml.
 # ------------------------------------------------------------------
 RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=uv.lock,target=uv.lock \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-    uv sync --frozen --extra postgres --no-dev --no-install-project
+    uv sync --frozen --no-dev --no-install-project
 
 # ------------------------------------------------------------------
 # Phase 2: copy source and install the project package itself.
@@ -56,18 +57,18 @@ COPY pyproject.toml uv.lock README.md ./
 COPY src ./src
 
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --extra postgres --no-dev
+    uv sync --frozen --no-dev
 
 # ---------------------------------------------------------------------------
 # Stage 2: runtime — minimal image, no build tools, no uv binary.
 # ---------------------------------------------------------------------------
 FROM python:3.14-slim AS runtime
 
-# libpq5   — shared library required by psycopg[binary] at runtime.
-# tini     — minimal init (PID 1 reaper) so SIGTERM propagates correctly.
+# tini — minimal init (PID 1 reaper) so SIGTERM propagates correctly.
 # No curl/wget — healthcheck uses python -c (saves a layer).
+# No libpq5 — Postgres dropped; SQLite ships with Python.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends libpq5 tini \
+    && apt-get install -y --no-install-recommends tini \
     && rm -rf /var/lib/apt/lists/*
 
 # Create a non-root user (uid 10001 is arbitrary but non-system).
@@ -89,6 +90,10 @@ WORKDIR /app
 # Copy virtualenv and source from builder; chown to non-root user.
 COPY --from=builder --chown=app:app /app/.venv /app/.venv
 COPY --from=builder --chown=app:app /app/src ./src
+
+# Persistence directory for the SQLite checkpoint (mounted by compose).
+# Pre-created with correct ownership so the non-root process can write.
+RUN install -d -o app -g app /app/data
 
 # Tini as PID 1 so uvicorn receives SIGTERM cleanly on container stop.
 ENTRYPOINT ["/usr/bin/tini", "--"]
