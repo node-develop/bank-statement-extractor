@@ -178,7 +178,7 @@ def test_extract_rejects_non_pdf(client_with_mock_graph: Any) -> None:
 
 def test_extract_rejects_oversize(client_with_mock_graph: Any) -> None:
     client, _ = client_with_mock_graph
-    big = b"A" * (26 * 1024 * 1024)  # 26 MB > 25 MB limit
+    big = b"A" * (90 * 1024 * 1024)  # 90 MB > 80 MB limit
     response = client.post(
         "/extract",
         files={"file": ("big.pdf", io.BytesIO(big), "application/pdf")},

@@ -133,10 +133,17 @@ def _invoke_llm(chunk: PeriodChunk, text: str) -> dict[str, Any]:
     raw_result: Account = llm_with_output.invoke([system, user])
 
     # Always overwrite chunk_id from the input chunk — LLM may echo exemplar id.
+    # Prefer the deterministic account_hint_last4 from split_periods over the
+    # LLM's guess: the account number often lives in header lines that fall
+    # OUTSIDE the truncated chunk text (extract_account truncates to 6000
+    # chars but the header sits above the Beginning Balance anchor and may
+    # be outside the period slice).  split_periods already did the regex
+    # lookback — trust it (rule 5: model only for judgment).
+    last4 = chunk.account_hint_last4 or raw_result.account_last4
     account = Account(
         chunk_id=chunk.chunk_id,
         bank=raw_result.bank,
-        account_last4=raw_result.account_last4,
+        account_last4=last4,
         period=raw_result.period,
     )
     return {"accounts": [account]}

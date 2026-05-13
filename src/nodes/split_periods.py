@@ -115,13 +115,24 @@ def split_periods(state: GraphState) -> dict[str, Any]:
 
     for k in range(n_chunks):
         beg_idx, beg_m = beg_matches[k]
-        end_idx, end_m = end_matches[k]
+        _end_idx, end_m = end_matches[k]  # end_idx no longer used for slicing
 
         mm_beg, dd_beg, yyyy_beg = beg_m.group(1), beg_m.group(2), beg_m.group(3)
         mm_end, dd_end, yyyy_end = end_m.group(1), end_m.group(2), end_m.group(3)
 
         chunk_id = f"period_{k + 1:02d}"
-        ocr_slice = "\n".join(lines[beg_idx : end_idx + 1])
+
+        # Slice from this period's Beginning anchor up to (but not including)
+        # the NEXT period's Beginning anchor — NOT just up to the Ending
+        # Balance line. In Ixonia, "Ending Balance as of …" appears in the
+        # summary block ABOVE the transaction list; if we cut at end_idx we
+        # capture only ~6 lines of header and miss every transaction row.
+        # Last chunk extends to the end of the file.
+        if k + 1 < n_chunks:
+            slice_end = beg_matches[k + 1][0]  # next period's Beginning line
+        else:
+            slice_end = len(lines)
+        ocr_slice = "\n".join(lines[beg_idx:slice_end])
 
         # ------------------------------------------------------------------
         # Account-number lookback
