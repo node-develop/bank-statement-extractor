@@ -22,5 +22,8 @@
     "@vitejs/plugin-react": "^4.4.1",
     "typescript": "^5.8.3",
     "vite": "^5.4.19"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["@biomejs/biome", "esbuild"]
   }
 }
