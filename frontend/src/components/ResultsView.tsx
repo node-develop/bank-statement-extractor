@@ -1,3 +1,4 @@
+import { fmt$, fmt$short, sumMoney } from "../lib/agentSteps";
 import type { ExtractResult, PeriodResult } from "../types";
 import { JSONViewer } from "./JSONViewer";
 import { PeriodCard } from "./PeriodCard";
@@ -31,6 +32,13 @@ export function ResultsView({
     result.pending_review != null ||
     result.periods.some((p) => (p.verifier?.suspects?.length ?? 0) > 0);
   const reviewPeriod = result.periods.find((p) => (p.verifier?.suspects?.length ?? 0) > 0);
+
+  // BigInt-cents sums (precision contract — never parseFloat money).
+  const depositsTotal = sumMoney(result.periods.map((p) => p.summary.deposits_total));
+  const withdrawalsTotal = sumMoney(result.periods.map((p) => p.summary.withdrawals_total));
+  const depositsCount = result.periods.reduce((a, p) => a + p.summary.deposits_count, 0);
+  const withdrawalsCount = result.periods.reduce((a, p) => a + p.summary.withdrawals_count, 0);
+  const totalTransactions = depositsCount + withdrawalsCount;
 
   return (
     <div className="container" style={{ paddingTop: 8 }}>
@@ -103,21 +111,23 @@ export function ResultsView({
         </div>
         <div>
           <div className="stat-label">Transactions</div>
-          <div className="big tnum">
-            {result.periods
-              .reduce((acc, p) => acc + p.summary.deposits_count + p.summary.withdrawals_count, 0)
-              .toLocaleString()}
-          </div>
+          <div className="big tnum">{totalTransactions.toLocaleString()}</div>
           <div className="t-caption" style={{ marginTop: 2 }}>
-            {result.periods.reduce((a, p) => a + p.summary.deposits_count, 0)} credits
-            {" · "}
-            {result.periods.reduce((a, p) => a + p.summary.withdrawals_count, 0)} debits
+            {depositsCount} credits · {withdrawalsCount} debits
           </div>
         </div>
         <div>
-          <div className="stat-label">Status</div>
-          <div className="big" style={{ fontSize: "var(--text-base)", paddingTop: 6 }}>
-            {allReconciled ? "All reconciled" : "Needs review"}
+          <div className="stat-label">Deposits</div>
+          <div className="big tnum">{fmt$short(depositsTotal)}</div>
+          <div className="t-caption" style={{ marginTop: 2 }}>
+            <span className="mono">{fmt$(depositsTotal)}</span>
+          </div>
+        </div>
+        <div>
+          <div className="stat-label">Withdrawals</div>
+          <div className="big tnum">{fmt$short(withdrawalsTotal)}</div>
+          <div className="t-caption" style={{ marginTop: 2 }}>
+            <span className="mono">{fmt$(withdrawalsTotal)}</span>
           </div>
         </div>
       </div>
@@ -195,6 +205,10 @@ export function ResultsView({
       <Divider />
 
       <JSONViewer data={result} />
+
+      <div className="mono" style={{ marginTop: 14, fontSize: 11, color: "var(--ink-4)" }}>
+        Values come from the document — never inferred. See README §CONTENT FUNDAMENTALS.
+      </div>
     </div>
   );
 }

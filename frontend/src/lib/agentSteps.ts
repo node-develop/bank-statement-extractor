@@ -135,6 +135,28 @@ export function fmt$short(s: string): string {
   }
 }
 
+/**
+ * Sum a list of decimal money strings using BigInt-cents arithmetic.
+ * Returns the result as a normalised decimal string with exactly 2 dp.
+ * Malformed inputs are skipped (caller may log).
+ */
+export function sumMoney(parts: Array<string | null | undefined>): string {
+  let total = 0n;
+  for (const s of parts) {
+    if (typeof s !== "string") continue;
+    try {
+      total += centsFromDecimalString(s);
+    } catch {
+      // Skip malformed entries silently — total stays accurate over good entries.
+    }
+  }
+  const negative = total < 0n;
+  const abs = negative ? -total : total;
+  const whole = abs / 100n;
+  const c = (abs % 100n).toString().padStart(2, "0");
+  return `${negative ? "-" : ""}${whole}.${c}`;
+}
+
 /** Format a period's `Apr 2025` from a YYYY-MM-DD string. */
 export function formatMonth(iso: string): string {
   const [y, m] = iso.split("-");
