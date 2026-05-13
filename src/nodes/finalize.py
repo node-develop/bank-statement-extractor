@@ -45,6 +45,7 @@ def finalize(state: GraphState) -> dict[str, Any]:
     layouts = state.get("layouts", [])
     reconciliations = state.get("reconciliations", [])
     transactions = state.get("transactions", [])
+    verifier_reports = state.get("verifier_reports", [])
     errors = list(state.get("errors", []))
 
     # Index per-chunk results by chunk_id for O(1) lookup.
@@ -52,6 +53,7 @@ def finalize(state: GraphState) -> dict[str, Any]:
     summary_by_id = {s.chunk_id: s for s in summaries}
     layout_by_id = {la.chunk_id: la for la in layouts}
     reconciliation_by_id = {r.chunk_id: r for r in reconciliations}
+    verifier_by_id = {v.chunk_id: v for v in verifier_reports}
 
     period_results: list[PeriodResult] = []
 
@@ -87,6 +89,7 @@ def finalize(state: GraphState) -> dict[str, Any]:
                 transactions=chunk_transactions,
                 layout=layout_str,
                 reconciliation=reconciliation_by_id[cid],
+                verifier=verifier_by_id.get(cid),
             )
         )
 
