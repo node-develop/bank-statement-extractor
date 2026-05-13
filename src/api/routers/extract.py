@@ -32,7 +32,7 @@ logger = get_logger(__name__)
 
 router = APIRouter()
 
-_MAX_PDF_BYTES = 25 * 1024 * 1024  # 25 MB
+_MAX_PDF_BYTES = 80 * 1024 * 1024  # 80 MB (Ixonia Binder2 is ~54 MB)
 _MAX_OCR_BYTES = 5 * 1024 * 1024  # 5 MB
 _PDF_CONTENT_TYPES = frozenset({"application/pdf", "application/x-pdf"})
 

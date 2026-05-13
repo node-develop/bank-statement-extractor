@@ -249,5 +249,11 @@ def test_split_periods_ocr_slice_spans_beg_to_end() -> None:
     chunks = result["period_chunks"]
     assert len(chunks) == 1
     assert chunks[0].ocr_slice is not None
+    # Slice spans from this period's Beginning anchor to the NEXT period's
+    # Beginning anchor (or end-of-file for the last/only period).  Transaction
+    # rows in real bank layouts appear AFTER the "Ending Balance" line, so the
+    # slice MUST include everything up to the file end here.
     assert chunks[0].ocr_slice.startswith("Beginning Balance as of 01/01/2025")
-    assert chunks[0].ocr_slice.endswith("Ending Balance as of 01/31/2025")
+    assert "mid-period transaction line" in chunks[0].ocr_slice
+    assert "Ending Balance as of 01/31/2025" in chunks[0].ocr_slice
+    assert chunks[0].ocr_slice.rstrip().endswith("$450.00")
