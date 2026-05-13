@@ -1,12 +1,15 @@
 import { useState } from "react";
 import { PeriodCard } from "./components/PeriodCard";
+import { ReviewModal } from "./components/ReviewModal";
 import { UploadForm } from "./components/UploadForm";
 import type { ExtractResult } from "./types";
 
 export default function App() {
   const [result, setResult] = useState<ExtractResult | null>(null);
+  const [reviewError, setReviewError] = useState<string | null>(null);
 
   const hasUnreconciled = result?.periods.some((p) => !p.reconciliation.reconciled);
+  const pendingReview = result?.pending_review ?? null;
 
   return (
     <div
@@ -25,6 +28,33 @@ export default function App() {
       </h1>
 
       <UploadForm onResult={setResult} />
+
+      {pendingReview !== null && (
+        <ReviewModal
+          pending={pendingReview}
+          onResolved={(r) => {
+            setResult(r);
+            setReviewError(null);
+          }}
+          onError={setReviewError}
+        />
+      )}
+
+      {reviewError !== null && (
+        <div
+          role="alert"
+          style={{
+            background: "#f8d7da",
+            border: "1px solid #dc3545",
+            borderRadius: 4,
+            padding: "10px 14px",
+            marginBottom: 16,
+            color: "#721c24",
+          }}
+        >
+          Review submission failed: {reviewError}
+        </div>
+      )}
 
       {result !== null && (
         <>

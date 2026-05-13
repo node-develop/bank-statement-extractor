@@ -10,6 +10,8 @@ __pycache__/
 # LangGraph checkpoint / runtime
 graph.sqlite
 graph.sqlite-*
+reviews.sqlite
+reviews.sqlite-*
 traces/
 src/evals/reports/*
 !src/evals/reports/.gitkeep

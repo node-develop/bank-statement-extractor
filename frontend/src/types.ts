@@ -54,6 +54,52 @@ export interface Reconciliation {
   notes: string[];
 }
 
+export interface Suspect {
+  chunk_id: string;
+  row_index: number;
+  code:
+    | "balance_chain_break"
+    | "date_order"
+    | "duplicate_row"
+    | "empty_description"
+    | "zero_amount"
+    | "summary_delta";
+  reason: string;
+  expected: string | null;
+  actual: string | null;
+}
+
+export interface Gap {
+  chunk_id: string;
+  after_row_index: number;
+  date_range: [string, string];
+  /** Decimal string — signed; positive = missing credit, negative = missing debit */
+  missing_amount: string;
+}
+
+export interface VerifierReport {
+  chunk_id: string;
+  /** Decimal string in [0, 1], 2dp */
+  confidence: string;
+  suspects: Suspect[];
+  gaps: Gap[];
+}
+
+export interface PendingReview {
+  extraction_id: string;
+  reason: "suspects_exceeded" | "cost_ceiling_exceeded" | "retry_exhausted";
+  suspect_count: number;
+}
+
+export interface TransactionCorrection {
+  chunk_id: string;
+  /** -1 = insert at end */
+  row_index: number;
+  action: "edit" | "insert" | "delete";
+  /** date / description / amount / direction / running_balance — all optional */
+  fields: Record<string, string | number | null>;
+}
+
 export interface PeriodResult {
   chunk_id: string;
   account: Account;
@@ -61,6 +107,7 @@ export interface PeriodResult {
   transactions: Transaction[];
   layout: string;
   reconciliation: Reconciliation;
+  verifier?: VerifierReport | null;
 }
 
 export interface ExtractResult {
@@ -68,4 +115,5 @@ export interface ExtractResult {
   statement_sha256: string;
   langsmith_run_url: string | null;
   errors: string[];
+  pending_review?: PendingReview | null;
 }

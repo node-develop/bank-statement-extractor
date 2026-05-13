@@ -6,7 +6,7 @@
  * default local backend origin.
  */
 
-import type { ExtractResult } from "./types";
+import type { ExtractResult, TransactionCorrection } from "./types";
 
 const API_BASE: string = import.meta.env.VITE_API_BASE ?? "http://localhost:8000";
 
@@ -64,5 +64,45 @@ export async function extractStatement(pdfFile: File, ocrFile?: File): Promise<E
     throw buildApiError(response.status, text);
   }
 
+  return JSON.parse(text) as ExtractResult;
+}
+
+/**
+ * GET the full payload of a paused extraction (suspects + chunk excerpts).
+ * The first read transitions the row to status='in_review'.
+ */
+export async function getReview(extractionId: string): Promise<{
+  extraction_id: string;
+  status: string;
+  reason: string | null;
+  review_payload: { suspects: unknown[]; reason: string };
+  statement_sha256: string;
+}> {
+  const response = await fetch(`${API_BASE}/review/${extractionId}`);
+  const text = await response.text();
+  if (!response.ok) {
+    throw buildApiError(response.status, text);
+  }
+  return JSON.parse(text);
+}
+
+/**
+ * POST corrections to resume a paused extraction.
+ * @param extractionId — uuid from ExtractResult.pending_review.
+ * @param payload — corrections list + force flag (force=true bypasses re-extraction).
+ */
+export async function submitReview(
+  extractionId: string,
+  payload: { corrections: TransactionCorrection[]; force: boolean },
+): Promise<ExtractResult> {
+  const response = await fetch(`${API_BASE}/review/${extractionId}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const text = await response.text();
+  if (!response.ok) {
+    throw buildApiError(response.status, text);
+  }
   return JSON.parse(text) as ExtractResult;
 }
