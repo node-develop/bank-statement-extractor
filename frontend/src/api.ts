@@ -261,6 +261,12 @@ export async function extractStatementStreaming(
         const ev = parseSseEvent(raw);
         if (ev !== null) {
           if (ev.kind === "result") {
+            if (ev.result === null || ev.result === undefined) {
+              throw new ApiError(
+                500,
+                "Extraction returned no result. Check the API logs for graph errors (most commonly: PDF without OCR text companion).",
+              );
+            }
             return ev.result;
           }
           if (ev.kind === "done") {
