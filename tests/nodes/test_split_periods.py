@@ -344,3 +344,60 @@ def test_split_periods_caseinsensitive_anchor() -> None:
     )
     result = split_periods(_make_state(ocr))
     assert len(result["period_chunks"]) == 1
+
+
+@pytest.mark.skipif(
+    not _IXONIA_OCR.exists(),
+    reason="Task/ixonia_binder2_ocr.txt not present in this environment",
+)
+def test_ixonia_page_ranges_non_overlapping_and_cover_all_pages() -> None:
+    """page_range tuples must be non-overlapping and cover every page.
+
+    Uses a synthetic page list built by line-grouping the OCR so the test
+    is self-contained.  The contract checked here is the post-fix invariant:
+      - first_page <= last_page for every chunk
+      - chunks[i].page_range[1] < chunks[i+1].page_range[0]  (no overlap)
+      - sum of spans >= total_pages - 2  (small slack for cover-page gaps)
+
+    The current ``_find_page_range`` violates non-overlap on the Ixonia
+    fixture: the substring search for "Ending Balance as of MM/DD/YYYY"
+    matches the structured-table recap section near the end of the document
+    too, so periods 02 / 06 / 07 / 08 / 10 have ``last_page`` stretched
+    into the recap region (page ~77 / 91 / 92 / 98) while period 03 still
+    begins at page 20.  The ``_resolve_period_pages`` fix removes the
+    end-anchor scan entirely (last_page = next_period_first_page - 1),
+    making non-overlap a structural guarantee.
+    """
+    from src.nodes.split_periods import split_periods
+
+    ocr_text = _IXONIA_OCR.read_text(encoding="utf-8")
+    if "\f" in ocr_text:
+        pages = ocr_text.split("\f")
+    else:
+        lines = ocr_text.splitlines()
+        page_size = max(1, len(lines) // 99)  # ~99 pages in Binder2
+        pages = ["\n".join(lines[i : i + page_size]) for i in range(0, len(lines), page_size)]
+
+    state = _make_state(ocr_text, pages=pages)
+    result = split_periods(state)
+    chunks = result["period_chunks"]
+    assert len(chunks) == 10
+
+    spans: list[int] = []
+    for i, chunk in enumerate(chunks):
+        first, last = chunk.page_range
+        assert first <= last, f"chunk {i}: first_page {first} > last_page {last}"
+        if i + 1 < len(chunks):
+            next_first = chunks[i + 1].page_range[0]
+            assert last < next_first, (
+                f"chunk {i} ends at page {last}, chunk {i + 1} begins at page "
+                f"{next_first} — overlap means the chunk's pdf_text leaks into "
+                f"the next period (and almost certainly into the recap section)"
+            )
+        spans.append(last - first + 1)
+
+    total_pages = len(pages)
+    assert sum(spans) >= total_pages - 2, (
+        f"Sum of page-range spans {sum(spans)} < total_pages {total_pages} - 2; "
+        f"some pages are not covered by any chunk"
+    )
