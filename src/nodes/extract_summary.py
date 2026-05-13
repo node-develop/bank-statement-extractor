@@ -1,7 +1,7 @@
 """``extract_summary`` graph node — extracts period monetary Summary per chunk.
 
 Invoked once per ``PeriodChunk`` via LangGraph ``Send`` fan-out (wired in
-``src/graph/builder.py``).  Uses Sonnet 4.6 with Anthropic prompt caching on
+``src/graph/builder.py``).  Uses Haiku 4.5 with Anthropic prompt caching on
 the stable prompt prefix.
 
 Never raises — on any recoverable error the node returns an all-zero Summary
@@ -47,8 +47,8 @@ def _get_llm() -> Any:
         from langchain_anthropic import ChatAnthropic
 
         _LLM_INSTANCE = ChatAnthropic(  # type: ignore[call-arg]
-            model="claude-sonnet-4-6",
-            max_tokens=4096,
+            model="claude-haiku-4-5",
+            max_tokens=1024,
             temperature=0,
             timeout=60,
         )

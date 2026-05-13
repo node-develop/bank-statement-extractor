@@ -2,7 +2,7 @@
 name: extract_account
 description: Extract bank name, masked-or-bare account last-4 digits, and statement period from one period chunk. Structured output for the Account model.
 version: 1
-model: claude-sonnet-4-6
+model: claude-haiku-4-5
 ---
 
 ## Role

@@ -10,7 +10,7 @@ from decimal import Decimal
 from typing import Any
 from unittest.mock import MagicMock, patch
 
-from src.models import PeriodChunk, Transaction
+from src.models import PeriodChunk
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -30,31 +30,44 @@ def _make_chunk(
     )
 
 
-def _make_transaction(
-    chunk_id: str = "period_01",
-    running_balance: Decimal | None = Decimal("598877.98"),
-) -> Transaction:
-    return Transaction(
-        chunk_id=chunk_id,
-        date=date(2025, 4, 1),
-        description="AIRLINEHYD 2759/VENDOR PMT",
-        amount=Decimal("1809.28"),
-        direction="credit",
-        running_balance=running_balance,
-    )
+class _FakeRow:
+    """Minimal _TransactionRow-like object for tests — no chunk_id."""
+
+    def __init__(
+        self,
+        tx_date: date,
+        description: str,
+        amount: Decimal,
+        direction: str,
+        running_balance: Decimal | None = None,
+    ) -> None:
+        self.date = tx_date
+        self.description = description
+        self.amount = amount
+        self.direction = direction
+        self.running_balance = running_balance
+
+    def model_dump(self) -> dict[str, Any]:
+        return {
+            "date": self.date,
+            "description": self.description,
+            "amount": self.amount,
+            "direction": self.direction,
+            "running_balance": self.running_balance,
+        }
 
 
-def _make_transaction_list_result(transactions: list[Transaction]) -> Any:
+def _make_transaction_list_result(rows: list[_FakeRow]) -> Any:
     """Return a mock _TransactionList-like object with a .transactions attribute."""
     result = MagicMock()
-    result.transactions = transactions
+    result.transactions = rows
     return result
 
 
-def _mock_llm_returning(transactions: list[Transaction]) -> MagicMock:
+def _mock_llm_returning(rows: list[_FakeRow]) -> MagicMock:
     """Mock that behaves like ChatAnthropic(...).with_structured_output(_TransactionList)."""
     structured = MagicMock()
-    structured.invoke.return_value = _make_transaction_list_result(transactions)
+    structured.invoke.return_value = _make_transaction_list_result(rows)
     llm = MagicMock()
     llm.with_structured_output.return_value = structured
     return llm
@@ -70,30 +83,13 @@ def test_extract_transactions_happy_path() -> None:
     from src.nodes.extract_transactions import extract_transactions
 
     llm_txs = [
-        Transaction(
-            chunk_id="ignored",
-            date=date(2025, 4, 1),
-            description="VENDOR PMT",
-            amount=Decimal("1809.28"),
-            direction="credit",
-            running_balance=Decimal("598877.98"),
+        _FakeRow(
+            date(2025, 4, 1), "VENDOR PMT", Decimal("1809.28"), "credit", Decimal("598877.98")
         ),
-        Transaction(
-            chunk_id="ignored",
-            date=date(2025, 4, 2),
-            description="ACH PAYMENT",
-            amount=Decimal("5000.00"),
-            direction="debit",
-            running_balance=Decimal("593877.98"),
+        _FakeRow(
+            date(2025, 4, 2), "ACH PAYMENT", Decimal("5000.00"), "debit", Decimal("593877.98")
         ),
-        Transaction(
-            chunk_id="ignored",
-            date=date(2025, 4, 3),
-            description="CHECK 40861",
-            amount=Decimal("617.16"),
-            direction="debit",
-            running_balance=Decimal("593260.82"),
-        ),
+        _FakeRow(date(2025, 4, 3), "CHECK 40861", Decimal("617.16"), "debit", Decimal("593260.82")),
     ]
     mock_llm = _mock_llm_returning(llm_txs)
     chunk = _make_chunk(chunk_id="period_01")
@@ -234,15 +230,14 @@ def test_extract_transactions_running_balance_decimal_preserved() -> None:
     from src.nodes.extract_transactions import extract_transactions
 
     precise_balance = Decimal("598877.98")
-    llm_tx = Transaction(
-        chunk_id="ignored",
-        date=date(2025, 4, 1),
+    llm_row = _FakeRow(
+        tx_date=date(2025, 4, 1),
         description="AIRLINEHYD 2759/VENDOR PMT",
         amount=Decimal("1809.28"),
         direction="credit",
         running_balance=precise_balance,
     )
-    mock_llm = _mock_llm_returning([llm_tx])
+    mock_llm = _mock_llm_returning([llm_row])
     chunk = _make_chunk(chunk_id="period_01")
 
     with patch("src.nodes.extract_transactions._get_llm", return_value=mock_llm):

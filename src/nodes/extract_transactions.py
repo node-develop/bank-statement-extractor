@@ -15,10 +15,12 @@ Never raises — on any recoverable error the node returns ``{"transactions": []
 
 from __future__ import annotations
 
-from typing import Any
+from datetime import date
+from decimal import Decimal  # noqa: TC003 — runtime-required by Pydantic field annotations
+from typing import Any, Literal
 
 import anthropic
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, ValidationError, field_validator
 
 from src.api.logging import get_logger
 from src.models import PeriodChunk, Transaction
@@ -35,15 +37,35 @@ _RECOVERABLE_ERRORS = (
 logger = get_logger(__name__)
 
 # ---------------------------------------------------------------------------
-# Container model — wraps list[Transaction] for with_structured_output.
-# Defined here (not in src/models) to keep that namespace clean.
+# LLM-facing schemas — defined here (not in src/models) to keep that namespace
+# clean.  Stripping ``chunk_id`` from the row schema saves ~30 output tokens
+# per row (≈ 5 760 tokens for Ixonia period_01 with 192 transactions).
+# chunk_id is re-injected server-side after the LLM returns.
 # ---------------------------------------------------------------------------
+
+
+class _TransactionRow(BaseModel):
+    """Single transaction row as the LLM sees it — no ``chunk_id``."""
+
+    date: date
+    description: str
+    amount: Decimal  # non-negative; sign conveyed by ``direction``
+    direction: Literal["credit", "debit"]
+    running_balance: Decimal | None = None
+
+    @field_validator("date", mode="before")
+    @classmethod
+    def _coerce_iso_date(cls, v: object) -> object:
+        """Accept ISO-8601 strings from LLM structured output."""
+        if isinstance(v, str):
+            return date.fromisoformat(v)
+        return v
 
 
 class _TransactionList(BaseModel):
     """Single-field container so with_structured_output has a concrete schema."""
 
-    transactions: list[Transaction]
+    transactions: list[_TransactionRow]
 
 
 # ---------------------------------------------------------------------------
@@ -159,16 +181,8 @@ def _invoke_llm(chunk: PeriodChunk, text: str) -> dict[str, Any]:
     llm_with_output = _get_llm().with_structured_output(_TransactionList)
     raw_result: _TransactionList = llm_with_output.invoke([system, user])
 
-    # Always overwrite chunk_id on every transaction from the input chunk.
+    # Inject chunk_id server-side — it is absent from _TransactionRow (LLM schema).
     tx_list = [
-        Transaction(
-            chunk_id=chunk.chunk_id,
-            date=tx.date,
-            description=tx.description,
-            amount=tx.amount,
-            direction=tx.direction,
-            running_balance=tx.running_balance,
-        )
-        for tx in raw_result.transactions
+        Transaction(chunk_id=chunk.chunk_id, **row.model_dump()) for row in raw_result.transactions
     ]
     return {"transactions": tx_list}
