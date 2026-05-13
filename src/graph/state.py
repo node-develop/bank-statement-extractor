@@ -75,6 +75,27 @@ def _add_decimal(left: Decimal, right: Decimal) -> Decimal:
     return left + right
 
 
+def _reduce_rows_by_chunk_id(left: list[Any], right: list[Any]) -> list[Any]:
+    """Reducer for ``transactions`` — replace all rows for a chunk_id on retry.
+
+    Unlike ``_reduce_by_chunk_id`` (one entry per chunk_id), this reducer
+    expects MANY rows per chunk_id (192 transactions on Ixonia period_01,
+    say).  Semantics: when the ``right`` side contains any rows for a given
+    chunk_id, drop ALL rows for that chunk_id from ``left`` and append the
+    new rows.  Other chunk_ids in ``left`` pass through untouched.
+
+    Without this, ``operator.add`` accumulates duplicates across critic-retry
+    extractor reruns: the second pass for period_01 appends another 192 rows
+    on top of the original 192, so verifier sees 384 rows, C3 ``duplicate_row``
+    and C1 ``balance_chain_break`` fire spuriously, and cost balloons.
+    """
+    if not right:
+        return list(left)
+    overwritten_chunks = {row.chunk_id for row in right}
+    keep_left = [row for row in left if row.chunk_id not in overwritten_chunks]
+    return keep_left + list(right)
+
+
 class GraphState(TypedDict):
     """Shared state threaded through every node of the extraction graph.
 
@@ -153,7 +174,7 @@ class GraphState(TypedDict):
     layouts: Annotated[list[LayoutLabel], operator.add]
     accounts: Annotated[list[Account], operator.add]
     summaries: Annotated[list[Summary], operator.add]
-    transactions: Annotated[list[Transaction], operator.add]
+    transactions: Annotated[list[Transaction], _reduce_rows_by_chunk_id]
     reconciliations: Annotated[list[Reconciliation], _reduce_by_chunk_id]
     retry_count: int
     errors: Annotated[list[str], operator.add]
