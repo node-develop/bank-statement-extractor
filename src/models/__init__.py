@@ -67,9 +67,32 @@ def _quantize(value: Decimal) -> Decimal:
 
 
 def _coerce_to_decimal(v: object, field_name: str = "value") -> Decimal:
-    """Coerce int/str/Decimal to Decimal; reject float."""
+    """Coerce int/str/float/Decimal to Decimal, quantized to 2dp.
+
+    Float was historically rejected as a guard against accidental float math
+    inside the codebase (rule 11 — Decimal for money, never float).  At the
+    LLM-input boundary, however, JSON deserialization unavoidably produces
+    ``float`` for numeric literals — Anthropic's structured-output API hands
+    LangChain a parsed JSON dict, which Pydantic then validates.  Refusing
+    float at that boundary makes every Haiku/Sonnet response with a numeric
+    money field fall back to a placeholder.
+
+    Trade-off: round-tripping ``float -> str -> Decimal`` preserves the
+    printed form (``str(48762.34) == "48762.34"``).  For values that came out
+    of the OCR text in the first place this is exact; for synthetic test data
+    it matches what the test author wrote.  The internal codebase still must
+    not introduce floats — that contract is enforced by ``mypy``'s strict
+    Decimal typing on every function signature.
+    """
     if isinstance(v, float):
-        raise ValueError(f"{field_name}: float is prohibited; pass Decimal or str instead")
+        v = str(v)
+    # Currency normalization on parse (PRD §architecture domain invariant #4):
+    # strip $, thousands-separator commas, and stray inline whitespace.  Only
+    # the textual form is mutated; the value is preserved.
+    if isinstance(v, str):
+        v = v.replace("$", "").replace(",", "").strip()
+        # OCR oddity: "509, 121.59" (stray space inside the number).
+        v = "".join(v.split())
     return _quantize(Decimal(str(v)))
 
 

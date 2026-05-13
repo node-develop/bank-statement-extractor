@@ -86,18 +86,24 @@ def _ixonia_apr_2025_summary() -> Summary:
     )
 
 
-def test_summary_rejects_float_for_money() -> None:
-    """rule 11 — no float for money, never."""
-    with pytest.raises(ValidationError):
-        Summary(
-            chunk_id="period_01",
-            beginning_balance=597068.70,  # type: ignore[arg-type]  # intentional: float must be rejected
-            ending_balance=Decimal("509121.59"),
-            deposits_total=Decimal("1214254.05"),
-            deposits_count=81,
-            withdrawals_total=Decimal("1302201.16"),
-            withdrawals_count=111,
-        )
+def test_summary_accepts_float_via_str_coercion() -> None:
+    """At the LLM-input boundary, JSON delivers numbers as float — the model
+    must accept them and convert via str() to preserve printed precision.
+
+    Internal callers still must not pass float (mypy enforces that on every
+    typed signature); this validator only fires when LangChain hands us a
+    float-typed value via with_structured_output.
+    """
+    s = Summary(
+        chunk_id="period_01",
+        beginning_balance=597068.70,  # type: ignore[arg-type]  # LLM-shape input
+        ending_balance=Decimal("509121.59"),
+        deposits_total=Decimal("1214254.05"),
+        deposits_count=81,
+        withdrawals_total=Decimal("1302201.16"),
+        withdrawals_count=111,
+    )
+    assert s.beginning_balance == Decimal("597068.70")
 
 
 def test_summary_json_round_trip_preserves_decimal() -> None:
@@ -156,15 +162,17 @@ def test_transaction_amount_rejects_negative() -> None:
         )
 
 
-def test_transaction_rejects_float_amount() -> None:
-    with pytest.raises(ValidationError):
-        Transaction(
-            chunk_id="period_01",
-            date=date(2025, 4, 1),
-            description="x",
-            amount=1809.28,  # type: ignore[arg-type]  # intentional: float must be rejected
-            direction="credit",
-        )
+def test_transaction_accepts_float_amount_via_str_coercion() -> None:
+    """LLM-side floats are accepted via the same str-coercion contract used
+    on Summary fields. mypy still rejects float in internal call sites."""
+    t = Transaction(
+        chunk_id="period_01",
+        date=date(2025, 4, 1),
+        description="x",
+        amount=1809.28,  # type: ignore[arg-type]  # LLM-shape input
+        direction="credit",
+    )
+    assert t.amount == Decimal("1809.28")
 
 
 def test_transaction_running_balance_optional() -> None:
