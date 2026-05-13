@@ -138,7 +138,9 @@ def _build_postgres() -> tuple[object, _Teardown]:
     it, giving the FastAPI lifespan full control over the connection lifetime.
     """
     try:
-        from langgraph.checkpoint.postgres import PostgresSaver  # type: ignore[import-not-found]
+        from langgraph.checkpoint.postgres import (
+            PostgresSaver,  # type: ignore[import-not-found,unused-ignore]
+        )
     except ImportError as exc:
         raise ImportError("PostgresSaver is not installed. Run: uv sync --extra postgres") from exc
 

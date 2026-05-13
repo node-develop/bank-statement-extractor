@@ -101,9 +101,7 @@ EXPOSE 8000
 # Docker's own view consistent. Uses python urllib — no curl dependency.
 # --start-period=20s gives the lifespan (checkpointer + graph compile) time.
 HEALTHCHECK --interval=10s --timeout=3s --retries=5 --start-period=20s \
-    CMD python -c \
-        "import urllib.request, sys; \
-         sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=2).status == 200 else 1)"
+    CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/healthz',timeout=2).status==200 else 1)"
 
 # --proxy-headers: trust X-Forwarded-* from Traefik/nginx reverse proxy.
 CMD ["uvicorn", "src.api.main:app", \
