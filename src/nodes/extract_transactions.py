@@ -23,6 +23,7 @@ import anthropic
 from pydantic import BaseModel, ValidationError, field_validator
 
 from src.api.logging import get_logger
+from src.api.pricing import call_cost
 from src.models import PeriodChunk, Transaction
 from src.prompts import load_prompt
 
@@ -178,11 +179,32 @@ def _invoke_llm(chunk: PeriodChunk, text: str) -> dict[str, Any]:
     )
     user = HumanMessage(content=dynamic_text)
 
-    llm_with_output = _get_llm().with_structured_output(_TransactionList)
-    raw_result: _TransactionList = llm_with_output.invoke([system, user])
+    # include_raw=True → {"raw": AIMessage, "parsed": _TransactionList, "parsing_error": None}
+    # so we can read usage_metadata for cost tracking (PRD §8.2).
+    # Defensive: if a test mock returns the parsed model directly instead of
+    # the include_raw dict, fall back gracefully — usage_metadata won't be
+    # available and cost will be 0 for that call.
+    llm_with_output = _get_llm().with_structured_output(_TransactionList, include_raw=True)
+    invoke_result: Any = llm_with_output.invoke([system, user])
+    if isinstance(invoke_result, dict):
+        raw_msg = invoke_result.get("raw")
+        raw_result: _TransactionList = invoke_result.get("parsed")  # type: ignore[assignment]
+    else:
+        raw_msg = None
+        raw_result = invoke_result
+
+    # Cost tracking — read usage_metadata from the AIMessage.
+    usage_md = getattr(raw_msg, "usage_metadata", None) or {}
+    this_call_cost = call_cost(_get_llm().model, usage_md if isinstance(usage_md, dict) else {})
+    if this_call_cost == 0 and usage_md:
+        logger.warning(
+            "extract_transactions: call_cost returned 0 for model=%r; usage_metadata=%r",
+            _get_llm().model,
+            usage_md,
+        )
 
     # Inject chunk_id server-side — it is absent from _TransactionRow (LLM schema).
     tx_list = [
         Transaction(chunk_id=chunk.chunk_id, **row.model_dump()) for row in raw_result.transactions
     ]
-    return {"transactions": tx_list}
+    return {"transactions": tx_list, "cumulative_cost_usd": this_call_cost}

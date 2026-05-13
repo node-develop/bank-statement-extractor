@@ -19,6 +19,7 @@ from __future__ import annotations
 import os
 import tempfile
 import uuid
+from decimal import Decimal
 from hashlib import sha256
 from typing import Annotated
 
@@ -136,8 +137,12 @@ async def extract(
         "summaries": [],
         "transactions": [],
         "reconciliations": [],
+        "verifier_reports": [],
         "retry_count": 0,
         "errors": [],
+        # Phase 3 — cumulative LLM cost (operator.add reducer in GraphState).
+        # Must be initialised here or the first node addition raises.
+        "cumulative_cost_usd": Decimal("0"),
     }
     # LangSmith metadata per CLAUDE.md "LangSmith" conventions.
     # `bank_slug` and `statement_pages` are NOT known at the API boundary —

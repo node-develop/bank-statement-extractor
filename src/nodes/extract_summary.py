@@ -17,6 +17,7 @@ import anthropic
 from pydantic import ValidationError
 
 from src.api.logging import get_logger
+from src.api.pricing import call_cost
 from src.models import PeriodChunk, Summary
 from src.prompts import load_prompt
 
@@ -130,8 +131,29 @@ def _invoke_llm(chunk: PeriodChunk, text: str) -> dict[str, Any]:
     )
     user = HumanMessage(content=text)
 
-    llm_with_output = _get_llm().with_structured_output(Summary)
-    raw_result: Summary = llm_with_output.invoke([system, user])
+    # include_raw=True → {"raw": AIMessage, "parsed": Summary, "parsing_error": None}
+    # so we can read usage_metadata for cost tracking (PRD §8.2).
+    # Defensive: if the LLM (or a test mock) returns the parsed model directly
+    # instead of the include_raw dict, fall back gracefully — usage_metadata
+    # won't be available and cost will be 0 for that call.
+    llm_with_output = _get_llm().with_structured_output(Summary, include_raw=True)
+    invoke_result: Any = llm_with_output.invoke([system, user])
+    if isinstance(invoke_result, dict):
+        raw_msg = invoke_result.get("raw")
+        raw_result: Summary = invoke_result.get("parsed")  # type: ignore[assignment]
+    else:
+        raw_msg = None
+        raw_result = invoke_result
+
+    # Cost tracking — read usage_metadata from the AIMessage.
+    usage_md = getattr(raw_msg, "usage_metadata", None) or {}
+    this_call_cost = call_cost(_get_llm().model, usage_md if isinstance(usage_md, dict) else {})
+    if this_call_cost == 0 and usage_md:
+        logger.warning(
+            "extract_summary: call_cost returned 0 for model=%r; usage_metadata=%r",
+            _get_llm().model,
+            usage_md,
+        )
 
     # Always overwrite chunk_id from the input chunk — LLM may echo exemplar id.
     summary = Summary(
@@ -143,4 +165,4 @@ def _invoke_llm(chunk: PeriodChunk, text: str) -> dict[str, Any]:
         withdrawals_total=raw_result.withdrawals_total,
         withdrawals_count=raw_result.withdrawals_count,
     )
-    return {"summaries": [summary]}
+    return {"summaries": [summary], "cumulative_cost_usd": this_call_cost}
