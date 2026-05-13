@@ -318,7 +318,12 @@ def _invoke_critic_llm(
     invoke_result: Any = llm_with_output.invoke([system, user])
     if isinstance(invoke_result, dict):
         raw_msg = invoke_result.get("raw")
-        result: CriticHint = invoke_result.get("parsed")  # type: ignore[assignment]
+        result: CriticHint | None = invoke_result.get("parsed")
+        parsing_error = invoke_result.get("parsing_error")
+        if result is None:
+            raise ValueError(
+                f"critic: structured-output parsed=None (parsing_error={parsing_error!r})"
+            )
     else:
         raw_msg = None
         result = invoke_result
