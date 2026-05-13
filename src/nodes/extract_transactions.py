@@ -115,9 +115,25 @@ def extract_transactions(chunk: PeriodChunk) -> dict[str, Any]:
         Always contains ``"transactions": list[Transaction]``.  Contains
         ``"errors"`` only when the LLM call or validation fails.
     """
-    # Prefer pdf_text; fall back to ocr_slice when pdf_text is empty.
-    # Do NOT truncate — transaction rows span the full chunk.
-    raw_text: str = chunk.pdf_text if chunk.pdf_text else (chunk.ocr_slice or "")
+    # Source-selection policy (spec:
+    # docs/superpowers/specs/2026-05-13-reconcile-10-of-10-design.md).
+    # pdf_text is primary — split_periods aligns it with chunk.page_range so
+    # every transaction page is visible to the LLM. ocr_slice is the fallback
+    # only when pdf_text is empty or whitespace-only; under the previous
+    # truthy-fallback a truncated-but-non-empty pdf_text silently shadowed
+    # ocr_slice, which was the dominant cause of incomplete extraction.
+    if chunk.pdf_text and chunk.pdf_text.strip():
+        raw_text = chunk.pdf_text
+        source = "pdf_text"
+    else:
+        raw_text = chunk.ocr_slice or ""
+        source = "ocr_slice_fallback"
+    logger.info(
+        "extract_transactions: %s using %s (%d chars)",
+        chunk.chunk_id,
+        source,
+        len(raw_text),
+    )
     if len(raw_text) > _WARN_CHARS:
         logger.warning(
             "extract_transactions: chunk %s text is %d chars (>%d); proceeding without truncation",
