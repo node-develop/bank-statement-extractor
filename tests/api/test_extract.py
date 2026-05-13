@@ -4,7 +4,7 @@ All tests use ``starlette.testclient.TestClient`` (ships with FastAPI).
 The LangGraph graph is mocked at the ``build_graph`` / ``build_checkpointer``
 level so no real Anthropic calls are made in CI.
 
-Etalon reference: docs/ixonia-etalon.md, period #1 (Apr 2025, account 1664).
+Etalon: period #1 (Apr 2025, account 1664).
 """
 
 from __future__ import annotations

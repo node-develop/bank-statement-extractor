@@ -1,4 +1,4 @@
-"""Tests for the HITL review endpoints (Phase 4 — PRD §5.8).
+"""Tests for the HITL review endpoints.
 
 All tests use ``starlette.testclient.TestClient`` and an in-memory mock
 of the LangGraph graph + an ephemeral SQLite reviews DB written under
@@ -274,7 +274,7 @@ def test_post_review_404_for_unknown_id(client_with_paused_graph: Any) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Test 6: 409 on POST when status is already 'resolved' (PRD §5.2)
+# Test 6: 409 on POST when status is already 'resolved'
 # ---------------------------------------------------------------------------
 
 

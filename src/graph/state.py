@@ -29,8 +29,8 @@ from decimal import Decimal  # noqa: TC003 — runtime annotation in cumulative_
 from typing import Annotated, Any, NotRequired, TypedDict
 
 # LangGraph's StateGraph calls `typing.get_type_hints()` on the TypedDict at
-# compile time, so the M0 models referenced in field annotations below must
-# be importable at runtime — not gated behind TYPE_CHECKING.
+# compile time, so the models referenced in field annotations below must be
+# importable at runtime — not gated behind TYPE_CHECKING.
 from src.models import (  # noqa: TC001 — runtime-required by LangGraph TypedDict introspection
     Account,
     ExtractResult,
@@ -58,11 +58,10 @@ def _reduce_by_chunk_id(left: list[Any], right: list[Any]) -> list[Any]:
     fan-out where each branch contributes a unique ``chunk_id``.  But the
     critic loop re-runs ``reconcile`` on retry passes, which would otherwise
     cause the ``reconciliations`` list to accumulate duplicate entries for the
-    same ``chunk_id`` (rule 12 — silent structural duplication).
+    same ``chunk_id`` — silent structural duplication.
 
     Semantics: last-write-wins by ``chunk_id``, preserving the order of first
-    appearance.  Used only for ``reconciliations`` in this milestone; M3 will
-    extend it to the extractor lists when extractor retries land.
+    appearance.
     """
     merged: dict[str, Any] = {x.chunk_id: x for x in left}
     for x in right:
@@ -144,27 +143,25 @@ class GraphState(TypedDict):
         Populated by ``finalize`` as the last step.  ``NotRequired`` so that
         all intermediate state snapshots remain valid before finalize runs.
     verifier_reports:
-        Phase 2 — verifier reports, one per chunk_id. ``_reduce_by_chunk_id``
-        so that re-extraction passes (Phase 3 critic loop) overwrite, not
-        append.
+        Verifier reports, one per chunk_id. ``_reduce_by_chunk_id`` so that
+        re-extraction passes (critic loop) overwrite, not append.
     cumulative_cost_usd:
-        Phase 3 — running sum of all LLM call costs in USD.  ``_add_decimal``
-        reducer accumulates per-call deltas returned by every LLM-using node.
+        Running sum of all LLM call costs in USD.  ``_add_decimal`` reducer
+        accumulates per-call deltas returned by every LLM-using node.
         Initial state MUST set this to ``Decimal("0")``.
     human_corrections:
-        Phase 4 — corrections submitted via POST /review/{id}.  Runtime type
-        is ``list[TransactionCorrection]``; typed ``Any`` here to avoid a
-        circular import with the Phase 4 model.  Last-write-wins (NotRequired).
+        Corrections submitted via POST /review/{id}.  Runtime type is
+        ``list[TransactionCorrection]``; typed ``Any`` here to avoid a
+        circular import.  Last-write-wins (NotRequired).
     force_resume:
-        Phase 4 — True when the human reviewer opts to bypass re-extraction
-        and accept the current result as-is.  Last-write-wins (NotRequired).
+        True when the human reviewer opts to bypass re-extraction and accept
+        the current result as-is.  Last-write-wins (NotRequired).
     pending_review:
-        Phase 4 — set by ``await_review`` when ``interrupt()`` fires, marking
-        that this thread is waiting for human input.  Last-write-wins
-        (NotRequired).
+        Set by ``await_review`` when ``interrupt()`` fires, marking that this
+        thread is waiting for human input.  Last-write-wins (NotRequired).
     review_payload:
-        Phase 4 — JSON-serialisable payload surfaced to the human via
-        ``interrupt()``.  Last-write-wins (NotRequired).
+        JSON-serialisable payload surfaced to the human via ``interrupt()``.
+        Last-write-wins (NotRequired).
     """
 
     pdf_path: str
@@ -184,15 +181,15 @@ class GraphState(TypedDict):
     notes: Annotated[list[str], operator.add]
     pending_hint: NotRequired[Any]
     final: NotRequired[ExtractResult]
-    # Phase 2 — verifier reports, one per chunk_id. ``_reduce_by_chunk_id`` so
-    # that re-extraction passes (Phase 3 critic loop) overwrite, not append.
+    # Verifier reports, one per chunk_id. ``_reduce_by_chunk_id`` so that
+    # re-extraction passes (critic loop) overwrite, not append.
     verifier_reports: Annotated[list[VerifierReport], _reduce_by_chunk_id]
-    # Phase 3 — cost ceiling tracking.  operator.add on Decimal is associative.
+    # Cost ceiling tracking. operator.add on Decimal is associative.
     # Initial state MUST set this to Decimal("0") at all invocation sites.
     cumulative_cost_usd: Annotated[Decimal, _add_decimal]
-    # Phase 4 — HITL fields (all NotRequired, last-write-wins).
+    # HITL fields (all NotRequired, last-write-wins).
     # ``human_corrections`` runtime type is list[TransactionCorrection]; typed
-    # Any here to avoid circular import — Phase 4 defines the real model.
+    # Any here to avoid circular import.
     human_corrections: NotRequired[list[Any]]
     force_resume: NotRequired[bool]
     pending_review: NotRequired[bool]

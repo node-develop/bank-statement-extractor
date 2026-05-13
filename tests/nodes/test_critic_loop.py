@@ -1,8 +1,8 @@
-"""Unit tests for src/nodes/critic_loop.py — business-intent assertions (rule 9).
+"""Unit tests for src/nodes/critic_loop.py — business-intent assertions.
 
-Phase 3 rewrite: ``critic`` now consumes ``verifier_reports`` (not
-``reconciliations``); the deprecated ``should_run_critic`` retains its
-old contract and is exercised separately for backward compat.
+``critic`` consumes ``verifier_reports`` (not ``reconciliations``); the
+deprecated ``should_run_critic`` retains its old contract and is exercised
+separately for backward compat.
 
 All tests monkeypatch ``_get_llm`` so no real Anthropic API key is needed.
 """
@@ -130,7 +130,7 @@ def _mock_llm_returning(hint: CriticHint) -> MagicMock:
 
 
 # ---------------------------------------------------------------------------
-# GraphState helper — Phase 3 takes verifier_reports
+# GraphState helper — takes verifier_reports
 # ---------------------------------------------------------------------------
 
 
@@ -163,7 +163,7 @@ def _make_state(
 
 
 # ---------------------------------------------------------------------------
-# Tests for ``critic`` node (Phase 3)
+# Tests for ``critic`` node
 # ---------------------------------------------------------------------------
 
 
@@ -262,7 +262,7 @@ class TestCriticNode:
 
 
 # ---------------------------------------------------------------------------
-# Tests for ``route_after_verifier`` router (Phase 3)
+# Tests for ``route_after_verifier`` router
 # ---------------------------------------------------------------------------
 
 

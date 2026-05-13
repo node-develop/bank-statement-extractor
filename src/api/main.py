@@ -10,7 +10,7 @@ Calls ``build_checkpointer()`` on startup, stores the saver on
 CORS
 ----
 Controlled by env var ``FRONTEND_ORIGIN`` (default ``http://localhost:5173``).
-Methods and headers are narrowly scoped per CLAUDE.md rule 5.
+Methods and headers are narrowly scoped.
 
 Logging
 -------
@@ -60,9 +60,9 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     saver, teardown = await build_async_checkpointer()
     app.state.checkpointer = saver
     app.state.graph = build_graph(checkpointer=saver)
-    # Phase 4 — initialise the pending-reviews schema.  Done here (not at
-    # import time) so the Docker volume mount has happened before the
-    # sqlite file is created at /app/data/reviews.sqlite.
+    # Initialise the pending-reviews schema.  Done here (not at import time)
+    # so the Docker volume mount has happened before the sqlite file is
+    # created at /app/data/reviews.sqlite.
     from src.api.reviews import init_reviews_db
 
     init_reviews_db()
@@ -113,7 +113,7 @@ def create_app() -> FastAPI:
     )
 
     # ------------------------------------------------------------------
-    # CORS — narrowly scoped (CLAUDE.md rule 5)
+    # CORS — narrowly scoped
     # ------------------------------------------------------------------
     frontend_origin = os.environ.get("FRONTEND_ORIGIN", "http://localhost:5173")
     application.add_middleware(

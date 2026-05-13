@@ -1,4 +1,4 @@
-"""Tests for src/nodes/extract_account.py — business-intent assertions (rule 9).
+"""Tests for src/nodes/extract_account.py — business-intent assertions.
 
 All tests monkeypatch ``_get_llm`` so no real Anthropic API key is needed.
 """

@@ -2,7 +2,7 @@
 
 Nodes and API routers import ``get_logger`` from this module instead of
 calling ``logging.getLogger`` directly.  This guarantees a single
-configuration point per CLAUDE.md prohibitions (no bare ``print``).
+configuration point.
 """
 
 from __future__ import annotations

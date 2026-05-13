@@ -1,4 +1,4 @@
-"""Tests for src/evals/scorers.py (rule 9 — business intent)."""
+"""Tests for src/evals/scorers.py — business intent."""
 
 from __future__ import annotations
 

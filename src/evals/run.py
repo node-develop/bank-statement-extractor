@@ -1,4 +1,4 @@
-"""CLI runner for the evaluation harness (Phase 10).
+"""CLI runner for the evaluation harness.
 
 Usage
 -----
@@ -147,7 +147,7 @@ def _build_period_from_etalon(entry: dict[str, Any]) -> PeriodResult:
         )
     if len(transactions) != tx_count:
         # Etalon's tx_count should equal deposits_count + withdrawals_count;
-        # if it doesn't, the dataset is wrong — surface loudly (rule 12).
+        # if it doesn't, the dataset is wrong — surface loudly.
         raise ValueError(
             f"{chunk_id}: tx_count ({tx_count}) != deposits_count + "
             f"withdrawals_count ({n_credit + n_debit})"

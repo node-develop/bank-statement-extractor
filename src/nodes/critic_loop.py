@@ -1,23 +1,14 @@
-"""``critic`` graph node + routing helpers — Phase 3 rewrite.
+"""``critic`` graph node + routing helpers.
 
-Phase 3 changes (PRD §4.2.1)
------------------------------
-The critic node now consumes ``state["verifier_reports"]`` instead of
-``state["reconciliations"]``.  In the new topology, reconciliation has NOT
-run yet when ``critic`` is invoked (verifier precedes reconcile); the old
-behaviour that early-returned on empty ``reconciliations`` would silently
-no-op.
+The critic node consumes ``state["verifier_reports"]``.  Reconciliation has
+NOT run yet when ``critic`` is invoked (verifier precedes reconcile).
 
-``route_after_verifier`` (NEW) is the conditional-edge router placed after
-``verifier``.  It replaces ``should_run_critic`` as the primary routing
-function; ``should_run_critic`` is kept for backward-compatibility but is
-marked deprecated.
+``route_after_verifier`` is the conditional-edge router placed after
+``verifier``.  ``apply_critic_hint`` is a separate node in
+``src/nodes/apply_critic_hint.py``.
 
-``apply_critic_hint`` is a separate node in ``src/nodes/apply_critic_hint.py``
-(PRD §4.2.2).
-
-Design decisions (unchanged from M2)
--------------------------------------
+Design decisions
+----------------
 - ``CriticHint`` is internal to this module; NOT exported from ``src/models``.
 - ``_RECOVERABLE`` covers all expected failure modes.
 - The prompt is loaded from ``src/prompts/critic.md`` via ``load_prompt``.
@@ -89,7 +80,7 @@ def _get_llm() -> Any:
 
 
 # ---------------------------------------------------------------------------
-# Public routing function (Phase 3)
+# Public routing function
 # ---------------------------------------------------------------------------
 
 
@@ -146,15 +137,14 @@ def route_after_verifier(state: GraphState) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Public node (Phase 3 rewrite)
+# Public node
 # ---------------------------------------------------------------------------
 
 
 def critic(state: GraphState) -> dict[str, Any]:
     """Diagnose the first verifier-flagged chunk and emit a ``CriticHint``.
 
-    Phase 3: reads ``state["verifier_reports"]`` instead of
-    ``state["reconciliations"]`` (reconcile has not run yet in the new
+    Reads ``state["verifier_reports"]`` (reconcile has not run yet in this
     topology).
 
     Parameters
@@ -223,11 +213,10 @@ def critic(state: GraphState) -> dict[str, Any]:
 
 
 def should_run_critic(state: GraphState) -> str:
-    """DEPRECATED — superseded by ``route_after_verifier`` in Phase 3.
+    """DEPRECATED — superseded by ``route_after_verifier``.
 
     Kept to avoid import errors in any test or code that still references it.
-    In the new topology (Phase 3), this function is no longer wired into the
-    graph; ``route_after_verifier`` is the active router after ``verifier``.
+    No longer wired into the graph.
 
     Returns
     -------
@@ -270,7 +259,7 @@ def _invoke_critic_llm(
     tuple[CriticHint, Decimal]
         The parsed hint and the USD cost of this LLM call.
 
-    Two-block prompt pattern (architecture.md):
+    Two-block prompt pattern:
     - Block 1 (stable prefix, cache_control ephemeral): everything before the
       ``## Reconciliation failure`` section in critic.md.
     - Block 2 (dynamic, no cache): the serialised suspect context.
@@ -324,7 +313,7 @@ def _invoke_critic_llm(
     user = HumanMessage(content=dynamic_block)
 
     # include_raw=True → {"raw": AIMessage, "parsed": CriticHint, "parsing_error": None}
-    # so we can read usage_metadata for cost tracking (PRD §8.2).
+    # so we can read usage_metadata for cost tracking.
     # Defensive: test mocks may return the parsed model directly — fall back.
     llm_with_output = _get_llm().with_structured_output(CriticHint, include_raw=True)
     invoke_result: Any = llm_with_output.invoke([system, user])

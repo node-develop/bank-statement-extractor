@@ -1,4 +1,4 @@
-"""Tests for src/nodes/ingest.py — business-intent assertions (rule 9)."""
+"""Tests for src/nodes/ingest.py — business-intent assertions."""
 
 from __future__ import annotations
 
@@ -201,8 +201,8 @@ def test_ingest_empty_page_surfaces_error(tmp_path: Path) -> None:
 def test_ingest_ocr_fallback_engages(tmp_path: Path) -> None:
     """Image-based PDF without .txt companion → ocrmypdf runs server-side.
 
-    Asserts the business intent from task.md: txt_path is optional, and the
-    service must handle scanned bank statements end-to-end (rule 4).
+    Asserts the business intent: txt_path is optional, and the service must
+    handle scanned bank statements end-to-end.
     """
     from src.nodes.ingest import ingest
 
@@ -236,7 +236,7 @@ def test_ingest_ocr_fallback_engages(tmp_path: Path) -> None:
 
 
 def test_ingest_ocr_fallback_skipped_on_dense_text(tmp_path: Path) -> None:
-    """A PDF with a real text layer should NOT invoke ocrmypdf (rule 2 — simplicity)."""
+    """A PDF with a real text layer should NOT invoke ocrmypdf."""
     from src.nodes.ingest import ingest
 
     pdf_path = tmp_path / "dense.pdf"
@@ -264,7 +264,7 @@ def test_ingest_ocr_fallback_skipped_with_companion_txt(tmp_path: Path) -> None:
     """If the user attaches their own OCR text, do NOT run Tesseract.
 
     Honors the "Advanced: attach .txt" override on the frontend — when present,
-    the caller knows better (rule 7 — surface conflicts, don't average).
+    the caller knows better.
     """
     from src.nodes.ingest import ingest
 
@@ -290,8 +290,7 @@ def test_ingest_ocr_fallback_skipped_with_companion_txt(tmp_path: Path) -> None:
 
 def test_ingest_ocr_fallback_failure_reported(tmp_path: Path) -> None:
     """When ocrmypdf fails (missing binary, corrupt PDF, etc.), ingest must NOT
-    crash — the failure is surfaced via errors[] so the user sees what happened
-    (rule 12 — fail loud, no silent gaps)."""
+    crash — the failure is surfaced via errors[] so the user sees what happened."""
     from src.nodes.ingest import OcrFallbackError, ingest
 
     pdf_path = tmp_path / "scan.pdf"

@@ -65,7 +65,7 @@ async def extract_stream(
 
     The temporary file(s) are deleted after the response is sent via a
     ``BackgroundTask`` so the graph can read them synchronously during
-    invocation (SKILL.md pattern).
+    invocation.
     """
     # ------------------------------------------------------------------
     # Content-type guard (415)
@@ -89,7 +89,7 @@ async def extract_stream(
         )
 
     # ------------------------------------------------------------------
-    # SHA-256 for LangSmith metadata + idempotent cache key (CLAUDE.md rule 3)
+    # SHA-256 for LangSmith metadata + idempotent cache key
     # ------------------------------------------------------------------
     digest = sha256(pdf_bytes).hexdigest()
 
@@ -142,11 +142,10 @@ async def extract_stream(
         "retry_count": 0,
         "errors": [],
         "notes": [],
-        # Phase 3 — cumulative LLM cost (operator.add reducer in GraphState).
+        # Cumulative LLM cost (operator.add reducer in GraphState).
         # Must be initialised here or the first node addition raises.
         "cumulative_cost_usd": Decimal("0"),
     }
-    # LangSmith metadata per CLAUDE.md "LangSmith" conventions.
     config: dict[str, Any] = {
         "configurable": {"thread_id": thread_id},
         "run_name": f"unknown:{digest[:8]}",

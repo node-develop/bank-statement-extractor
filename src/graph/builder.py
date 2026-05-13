@@ -1,7 +1,7 @@
 """Graph builder for the bank-statement-analizer extraction pipeline.
 
-Topology (architecture.md — Phase 3)
---------------------------------------
+Topology
+--------
 ::
 
     START
@@ -55,17 +55,6 @@ accumulates per-call cost deltas returned by every LLM-using node.  When
 the total reaches ``HARD_COST_CAP_USD`` (default $5.00, overridable via
 ``BSA_COST_CAP_USD`` env var), ``route_after_verifier`` routes to
 ``await_review`` regardless of suspect count.
-
-LangGraph API notes (confirmed via context7)
---------------------------------------------
-- ``Send`` is imported from ``langgraph.types``.
-- ``add_conditional_edges("node", fn)`` where ``fn`` returns a list of
-  ``Send`` objects is the documented map-reduce pattern.
-- ``graph.compile(checkpointer=saver)`` — checkpointer is optional; omit the
-  kwarg entirely when ``None`` to avoid passing ``None`` to the underlying
-  pydantic schema.
-- ``recursion_limit`` is set in the invoke ``config`` dict, not at compile
-  time.
 """
 
 from __future__ import annotations
@@ -174,8 +163,8 @@ def build_graph(checkpointer: object | None = None) -> Any:
 
     # ------------------------------------------------------------------
     # Fan-out: split_periods -> [Send per chunk x 4 nodes]
-    # Confirmed API: add_conditional_edges with a function returning
-    # list[Send] is the documented map-reduce pattern (context7).
+    # add_conditional_edges with a function returning list[Send] is the
+    # documented map-reduce pattern.
     # ------------------------------------------------------------------
     graph.add_conditional_edges(
         "split_periods",
@@ -219,7 +208,7 @@ def build_graph(checkpointer: object | None = None) -> Any:
     )
 
     # ------------------------------------------------------------------
-    # HITL path (Phase 4): await_review →
+    # HITL path: await_review →
     #   - force_resume=True OR no corrections → "finalize"
     #   - corrections present → list[Send] dispatching extract_transactions
     # Mirrors the ``critic → apply_critic_hint`` pattern: the helper is used
@@ -257,7 +246,7 @@ def build_graph(checkpointer: object | None = None) -> Any:
     else:
         compiled = graph.compile()
 
-    logger.info("build_graph: compiled extraction graph (Phase 3 topology)")
+    logger.info("build_graph: compiled extraction graph")
     return compiled
 
 

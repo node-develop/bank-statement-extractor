@@ -37,3 +37,20 @@ CLAUDE.local.md
 
 # Task/ source PDFs are read-only; never commit (CLAUDE.md).
 Task/*.pdf
+
+# Claude Code harness (not committed)
+.claude/
+.mcp.json
+
+# Internal documentation (not committed)
+docs/
+PRD.md
+CLAUDE.md
+AGENTS.md
+
+# GitNexus index (local-only)
+.gitnexus/
+
+# Dev scratch
+test_main.http
+main.py

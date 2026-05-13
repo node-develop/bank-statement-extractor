@@ -1,4 +1,4 @@
-"""Tests for src/nodes/merge_state.py — business-intent assertions (rule 9).
+"""Tests for src/nodes/merge_state.py — business-intent assertions.
 
 merge_state is a no-op pass-through that verifies list counts are balanced.
 No LLM; no mocking needed.

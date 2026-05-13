@@ -70,12 +70,12 @@ def _coerce_to_decimal(v: object, field_name: str = "value") -> Decimal:
     """Coerce int/str/float/Decimal to Decimal, quantized to 2dp.
 
     Float was historically rejected as a guard against accidental float math
-    inside the codebase (rule 11 — Decimal for money, never float).  At the
-    LLM-input boundary, however, JSON deserialization unavoidably produces
-    ``float`` for numeric literals — Anthropic's structured-output API hands
-    LangChain a parsed JSON dict, which Pydantic then validates.  Refusing
-    float at that boundary makes every Haiku/Sonnet response with a numeric
-    money field fall back to a placeholder.
+    inside the codebase (Decimal for money, never float).  At the LLM-input
+    boundary, however, JSON deserialization unavoidably produces ``float``
+    for numeric literals — Anthropic's structured-output API hands LangChain
+    a parsed JSON dict, which Pydantic then validates.  Refusing float at
+    that boundary makes every Haiku/Sonnet response with a numeric money
+    field fall back to a placeholder.
 
     Trade-off: round-tripping ``float -> str -> Decimal`` preserves the
     printed form (``str(48762.34) == "48762.34"``).  For values that came out
@@ -86,9 +86,9 @@ def _coerce_to_decimal(v: object, field_name: str = "value") -> Decimal:
     """
     if isinstance(v, float):
         v = str(v)
-    # Currency normalization on parse (PRD §architecture domain invariant #4):
-    # strip $, thousands-separator commas, and stray inline whitespace.  Only
-    # the textual form is mutated; the value is preserved.
+    # Currency normalization on parse: strip $, thousands-separator commas,
+    # and stray inline whitespace.  Only the textual form is mutated; the
+    # value is preserved.
     if isinstance(v, str):
         v = v.replace("$", "").replace(",", "").strip()
         # OCR oddity: "509, 121.59" (stray space inside the number).
@@ -331,7 +331,7 @@ class LayoutLabel(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Verifier models (Phase 2)
+# Verifier models
 # ---------------------------------------------------------------------------
 class Suspect(BaseModel):
     """A single row-level anomaly detected by the deterministic verifier."""
@@ -408,7 +408,7 @@ class PendingReview(BaseModel):
 
 
 class TransactionCorrection(BaseModel):
-    """One human-supplied row-level correction (Phase 4 — PRD §5.2).
+    """One human-supplied row-level correction.
 
     ``action="edit"`` updates fields on row ``row_index``;
     ``action="insert"`` injects a new row at ``row_index`` (use -1 for end);
@@ -442,7 +442,7 @@ class PeriodResult(BaseModel):
     transactions: list[Transaction]
     layout: str
     reconciliation: Reconciliation
-    verifier: VerifierReport | None = None  # Phase 2 — None if verifier didn't run
+    verifier: VerifierReport | None = None  # None if verifier didn't run
 
 
 # ---------------------------------------------------------------------------
@@ -460,9 +460,9 @@ class ExtractResult(BaseModel):
     # failures, mismatches, corrupt input. Rendered in a danger/warning block.
     errors: list[str] = Field(default_factory=list)
     # notes[]: informational pipeline notices — which OCR engine ran, why a
-    # critic loop kicked off, etc. Per rule 12 ("surface uncertainty"), these
-    # belong in the response but they're NOT errors. Rendered separately
-    # (info block) on the frontend so the user can distinguish "we did
-    # something noteworthy" from "something went wrong".
+    # critic loop kicked off, etc. These belong in the response but they're
+    # NOT errors. Rendered separately (info block) on the frontend so the
+    # user can distinguish "we did something noteworthy" from "something
+    # went wrong".
     notes: list[str] = Field(default_factory=list)
-    pending_review: PendingReview | None = None  # Phase 2 — None on the happy path
+    pending_review: PendingReview | None = None  # None on the happy path

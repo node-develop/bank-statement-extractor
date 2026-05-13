@@ -1,6 +1,6 @@
 """LLM pricing table + hard cost cap.
 
-Single source for all cost-control constants (PRD §8.1).  Imported by:
+Single source for all cost-control constants.  Imported by:
 
 - ``src/nodes/route_after_verifier`` (in ``src/nodes/critic_loop.py``) to
   decide when to short-circuit to ``await_review``.
@@ -10,7 +10,7 @@ Single source for all cost-control constants (PRD §8.1).  Imported by:
 
 Pricing is the May-2026 published rate per million tokens for each
 Anthropic model in use.  Values are quoted as ``Decimal`` to avoid float
-drift when summed across the 10-period Ixonia fan-out.
+drift when summed across the fan-out.
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ PRICING_USD_PER_M_TOKENS: dict[str, dict[str, Decimal]] = {
     "claude-sonnet-4-6": {"input": Decimal("3.00"), "output": Decimal("15.00")},
 }
 
-# D5 — abort the request when cumulative LLM spend reaches this dollar value.
+# Abort the request when cumulative LLM spend reaches this dollar value.
 # Overridable via env so tests + pathological statements can tighten/relax it.
 HARD_COST_CAP_USD: Decimal = Decimal(os.environ.get("BSA_COST_CAP_USD", "5.00"))
 

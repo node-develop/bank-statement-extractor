@@ -88,9 +88,8 @@ def classify_layout(chunk: PeriodChunk) -> dict[str, Any]:
 def _tag_run_unknown_layout() -> None:
     """Tag the active LangSmith run with ``unknown_layout``.
 
-    Soft requirement (architecture.md Error model): when classify_layout
-    emits ``unknown``, the run should be tagged so the trace is searchable.
-    No-op when LangSmith is not active (e.g. unit tests).
+    When classify_layout emits ``unknown``, the run should be tagged so the
+    trace is searchable.  No-op when LangSmith is not active (e.g. unit tests).
     """
     try:
         from langsmith.run_helpers import get_current_run_tree
@@ -109,10 +108,9 @@ def _invoke_llm(chunk: PeriodChunk, text: str) -> dict[str, Any]:
 
     The stable prompt prefix (everything before ``{chunk_text}``) is sent as a
     separate content block with ``cache_control: ephemeral`` so that the prefix
-    is cached and reused across the 10-period fan-out (architecture.md "Shared
-    system prompt uses Anthropic prompt caching").  The dynamic chunk text goes
-    in a second content block WITHOUT cache_control, so it doesn't poison the
-    cache key.
+    is cached and reused across the 10-period fan-out.  The dynamic chunk text
+    goes in a second content block WITHOUT cache_control, so it doesn't poison
+    the cache key.
     """
     from langchain_core.messages import HumanMessage, SystemMessage
 
@@ -124,8 +122,7 @@ def _invoke_llm(chunk: PeriodChunk, text: str) -> dict[str, Any]:
         stable_prefix = prompt_body
 
     # Stable prefix → SystemMessage (cached via cache_control: ephemeral).
-    # Dynamic chunk text → HumanMessage (Anthropic requires ≥1 user message;
-    # docs.langchain.com/oss/python/langgraph/use-graph-api).
+    # Dynamic chunk text → HumanMessage (Anthropic requires ≥1 user message).
     system = SystemMessage(
         content=[
             {
@@ -138,7 +135,7 @@ def _invoke_llm(chunk: PeriodChunk, text: str) -> dict[str, Any]:
     user = HumanMessage(content=text)
 
     # include_raw=True returns {"raw": AIMessage, "parsed": LayoutLabel, "parsing_error": None}
-    # so we can read usage_metadata for cost tracking (PRD §8.2).
+    # so we can read usage_metadata for cost tracking.
     # Defensive: test mocks may return the parsed model directly — fall back.
     llm_with_output = _get_llm().with_structured_output(LayoutLabel, include_raw=True)
     invoke_result: Any = llm_with_output.invoke([system, user])

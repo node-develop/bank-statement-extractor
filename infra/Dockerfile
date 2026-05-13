@@ -1,18 +1,8 @@
 # bank-statement-analizer — multi-stage backend Dockerfile.
-#
-# Base: python:3.14-slim — matches pyproject.toml requires-python and the
-# lockfile's resolved interpreter.  python:3.14-slim has been on Docker Hub
-# since late 2025 (Python 3.14.0 released 2025-10-07).
+# base: python:3.14-slim; uv pulled from official image.
 #
 # Build context must be the repository root:
 #   docker build -f infra/Dockerfile -t bsa-api .
-
-# ---------------------------------------------------------------------------
-# Stage 1: uv-base — install uv into the builder image via official image copy.
-# Using COPY --from=ghcr.io/astral-sh/uv avoids pip overhead and pins uv
-# separately from Python. Pin to a specific digest in prod (see TODO below).
-# TODO: pin uv to digest in production, e.g. ghcr.io/astral-sh/uv:0.5.x@sha256:...
-# ---------------------------------------------------------------------------
 FROM python:3.14-slim AS builder
 
 # Pull the uv binary from the official image (no pip install required).
@@ -30,15 +20,15 @@ ENV UV_LINK_MODE=copy \
 WORKDIR /app
 
 # ------------------------------------------------------------------
-# Phase 1: install dependencies only (cache-layer discipline, rule 4).
-# pyproject.toml + uv.lock are bound at build time via mount; the
-# resulting .venv IS materialised into the image via UV_LINK_MODE=copy.
+# Install dependencies only — cache-layer discipline.
+# pyproject.toml + uv.lock are bound at build time via mount; the resulting
+# .venv IS materialised into the image via UV_LINK_MODE=copy.
 # --mount=type=bind keeps pyproject.toml/uv.lock out of the image layer
 # while still making them visible to uv.
 # --no-install-project skips installing the src/ package itself so this
 # layer is invalidated only when deps change, not on every source edit.
 # --no-dev excludes ruff, mypy, pytest from the runtime image.
-# --frozen = fail the build if uv.lock is out of date (rule 4).
+# --frozen = fail the build if uv.lock is out of date.
 # No extras: SQLite + aiosqlite ship via langgraph-checkpoint-sqlite which
 # is a core (non-optional) dependency in pyproject.toml.
 # ------------------------------------------------------------------
@@ -48,7 +38,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev --no-install-project
 
 # ------------------------------------------------------------------
-# Phase 2: copy source and install the project package itself.
+# Copy source and install the project package itself.
 # hatchling requires README.md to be present (build-backend reads it).
 # We do NOT bind-mount src/ — changes to source code invalidate only
 # this layer, not the dependency layer above.

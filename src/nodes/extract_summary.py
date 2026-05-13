@@ -173,7 +173,7 @@ def _invoke_llm(chunk: PeriodChunk, text: str) -> dict[str, Any]:
     user = HumanMessage(content=text)
 
     # include_raw=True → {"raw": AIMessage, "parsed": Summary, "parsing_error": None}
-    # so we can read usage_metadata for cost tracking (PRD §8.2).
+    # so we can read usage_metadata for cost tracking.
     # Defensive: if the LLM (or a test mock) returns the parsed model directly
     # instead of the include_raw dict, fall back gracefully — usage_metadata
     # won't be available and cost will be 0 for that call.
@@ -186,7 +186,7 @@ def _invoke_llm(chunk: PeriodChunk, text: str) -> dict[str, Any]:
         if raw_result is None:
             # The LLM produced output that failed Pydantic validation.
             # Surface as a ValueError so the extract_summary outer try/except
-            # falls back to a placeholder + errors[] entry (rule 12).
+            # falls back to a placeholder + errors[] entry.
             raise ValueError(
                 f"extract_summary: structured-output parsed=None (parsing_error={parsing_error!r})"
             )

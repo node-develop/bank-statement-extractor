@@ -1,5 +1,5 @@
 """Application-level pending-reviews index — separate from the LangGraph
-checkpointer database (PRD §5.1).
+checkpointer database.
 
 The LangGraph checkpointer (``graph.sqlite``) holds per-thread state needed
 for ``Command(resume=...)``; this module's ``reviews.sqlite`` holds the

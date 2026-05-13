@@ -1,4 +1,4 @@
-"""Tests for src/nodes/extract_transactions.py — business-intent assertions (rule 9).
+"""Tests for src/nodes/extract_transactions.py — business-intent assertions.
 
 All tests monkeypatch ``_get_llm`` so no real Anthropic API key is needed.
 """
@@ -225,7 +225,7 @@ def test_extract_transactions_dynamic_block_contains_metadata() -> None:
 
 def test_extract_transactions_running_balance_decimal_preserved() -> None:
     """running_balance=Decimal('598877.98') must survive the LLM output path without
-    float-representation drift (CLAUDE.md: Decimal, not float).
+    float-representation drift (Decimal, not float).
     """
     from src.nodes.extract_transactions import extract_transactions
 

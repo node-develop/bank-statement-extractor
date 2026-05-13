@@ -115,13 +115,12 @@ def extract_transactions(chunk: PeriodChunk) -> dict[str, Any]:
         Always contains ``"transactions": list[Transaction]``.  Contains
         ``"errors"`` only when the LLM call or validation fails.
     """
-    # Source-selection policy (spec:
-    # docs/superpowers/specs/2026-05-13-reconcile-10-of-10-design.md).
-    # pdf_text is primary — split_periods aligns it with chunk.page_range so
-    # every transaction page is visible to the LLM. ocr_slice is the fallback
-    # only when pdf_text is empty or whitespace-only; under the previous
-    # truthy-fallback a truncated-but-non-empty pdf_text silently shadowed
-    # ocr_slice, which was the dominant cause of incomplete extraction.
+    # Source-selection policy: pdf_text is primary — split_periods aligns it
+    # with chunk.page_range so every transaction page is visible to the LLM.
+    # ocr_slice is the fallback only when pdf_text is empty or whitespace-only;
+    # under the previous truthy-fallback a truncated-but-non-empty pdf_text
+    # silently shadowed ocr_slice, which was the dominant cause of incomplete
+    # extraction.
     if chunk.pdf_text and chunk.pdf_text.strip():
         raw_text = chunk.pdf_text
         source = "pdf_text"
@@ -162,7 +161,7 @@ def _invoke_llm(chunk: PeriodChunk, text: str) -> dict[str, Any]:
     is cached and reused across the 10-period fan-out.  The dynamic block goes
     in a second content block WITHOUT cache_control.
 
-    ``beginning_balance`` is passed as the sentinel ``"unknown"`` at M2 R2.
+    ``beginning_balance`` is passed as the sentinel ``"unknown"``.
     The prompt instructs the model to use the running-balance-delta rule from
     the first printed balance when the sentinel is present.
     """
@@ -197,7 +196,7 @@ def _invoke_llm(chunk: PeriodChunk, text: str) -> dict[str, Any]:
     user = HumanMessage(content=dynamic_text)
 
     # include_raw=True → {"raw": AIMessage, "parsed": _TransactionList, "parsing_error": None}
-    # so we can read usage_metadata for cost tracking (PRD §8.2).
+    # so we can read usage_metadata for cost tracking.
     # Defensive: if a test mock returns the parsed model directly instead of
     # the include_raw dict, fall back gracefully — usage_metadata won't be
     # available and cost will be 0 for that call.

@@ -1,9 +1,9 @@
 """``apply_human_corrections`` node — re-dispatch extract_transactions per
 chunk that has corrections, with the corrections injected as a prompt hint.
 
-PRD §5.5: hint MUST be injected into BOTH ``pdf_text`` AND ``ocr_slice``
-because ``src/nodes/extract_transactions.py`` prefers ``pdf_text`` and
-only falls back to ``ocr_slice`` when ``pdf_text`` is empty.
+The hint MUST be injected into BOTH ``pdf_text`` AND ``ocr_slice`` because
+``src/nodes/extract_transactions.py`` prefers ``pdf_text`` and only falls
+back to ``ocr_slice`` when ``pdf_text`` is empty.
 
 Returns ``list[Send]`` consumed by the conditional edge in builder.py;
 an empty list short-circuits to finalize.
