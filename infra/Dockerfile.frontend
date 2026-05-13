@@ -26,6 +26,13 @@ WORKDIR /app
 # ------------------------------------------------------------------
 COPY frontend/package.json frontend/pnpm-lock.yaml ./
 
+# pnpm 10 defaults to strict-dep-builds (refuse to run postinstall scripts
+# of deps unless explicitly allowed).  Biome 1.9 + esbuild ship native
+# binaries via postinstall — required for `vite build`.  We allow all in
+# the Docker builder; the host pnpm install reads onlyBuiltDependencies
+# from package.json which has the same allow-list.
+ENV PNPM_CONFIG_STRICT_DEP_BUILDS=false
+
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
     pnpm install --frozen-lockfile
 
