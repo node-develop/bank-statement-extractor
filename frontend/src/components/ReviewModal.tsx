@@ -6,6 +6,7 @@
  * result as-is).
  */
 
+import type React from "react";
 import { useEffect, useState } from "react";
 import { ApiError, getReview, submitReview } from "../api";
 import type { ExtractResult, PendingReview, Suspect, TransactionCorrection } from "../types";
