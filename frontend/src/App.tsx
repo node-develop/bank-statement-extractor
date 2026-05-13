@@ -1,5 +1,5 @@
-import { useCallback, useState } from "react";
-import { ApiError, extractStatement, submitReview } from "./api";
+import { useCallback, useRef, useState } from "react";
+import { ApiError, extractStatementStreaming, submitReview } from "./api";
 import { Header } from "./components/Header";
 import { ProcessingView } from "./components/ProcessingView";
 import { ResultsView } from "./components/ResultsView";
@@ -31,20 +31,32 @@ export default function App() {
   const [submitBusy, setSubmitBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const abortRef = useRef<AbortController | null>(null);
+
   const onProgress: ProgressCallback = useCallback((p) => setProgress(p), []);
-  // Reserved for Phase 6 streaming wiring (extractStatementStreaming).
-  void onProgress;
 
   async function handleSubmit(pdf: File, ocr: File | null) {
     setError(null);
     setFilename(pdf.name);
     setProgress(emptyProgress());
     setPhase("processing");
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
     try {
-      const r = await extractStatement(pdf, ocr ?? undefined);
+      const r = await extractStatementStreaming(
+        pdf,
+        ocr ?? undefined,
+        onProgress,
+        controller.signal,
+      );
       setResult(r);
       setPhase("results");
     } catch (e) {
+      if (controller.signal.aborted) {
+        setPhase("upload");
+        return;
+      }
       const msg = e instanceof ApiError ? e.message : "Network error — is the API running?";
       setError(msg);
       setPhase("upload");
@@ -86,8 +98,12 @@ export default function App() {
         {phase === "processing" && (
           <ProcessingView
             progress={progress}
-            periods={[] /* fill in once split_periods event arrives */}
-            onCancel={() => setPhase("upload")}
+            periods={Object.keys(progress.period_states).map((id) => ({
+              id,
+              month: "Unknown",
+              last4: "",
+            }))}
+            onCancel={() => abortRef.current?.abort()}
           />
         )}
         {phase === "results" && result && (
