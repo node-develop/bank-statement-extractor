@@ -215,3 +215,29 @@ If reconciliation still fails after 2 critic retries, the response carries
 | Reconciliation fails after N retries | HTTP 200, body includes `reconciliation.reconciled = false` and `delta` |
 | OCR confidence < threshold (when computable) | Warning in `notes[]`, never silent |
 | Anthropic 5xx | Retry with exponential backoff (LangChain default), surface after 3 attempts |
+
+## SSE event mapping (Phase 0, langgraph >= 1.0.8)
+
+`graph.astream_events(state, config, version="v2")` yields dicts with:
+
+| Field | Type | Meaning |
+|---|---|---|
+| `event` | `"on_chain_start" \| "on_chain_end" \| "on_chat_model_end" \| ...` | event kind |
+| `name` | `str` | node id (matches `add_node("name", ...)`) |
+| `run_id` | `str` (UUID) | unique per branch — each `Send(...)` task gets a child callback manager with its own `run_id` |
+| `tags` | `list[str]` | propagated from `config.tags`; LangGraph does **not** auto-inject a `langgraph:node=<name>` tag — node tags default to `[]` unless set via `.meta(tag)` on the `StateGraph` node |
+| `data.input` | `dict` | node input on `_start` |
+| `data.output` | `Any` | node output on `_end` |
+| `data.output.usage_metadata` | `dict[str, int]` | on `on_chat_model_end` only |
+
+Fan-out: each `Send(...)` branch fires its own `on_chain_start` /
+`on_chain_end` pair under the same `name`. Server-side aggregation
+(see `src/api/streaming.py`, Phase 4) merges N branches into one
+timeline lane per step.
+
+**Verified against installed langgraph 1.2.0** (`pregel/_algo.py` lines 704, 1058, 1199;
+`pregel/_read.py` lines 178, 253; `graph/state.py` lines 1497, 1518).
+Divergences from plan draft: (1) `run_id` is per-branch not per-invocation —
+`manager.get_child(...)` creates a fresh child callback manager per task;
+(2) no automatic `langgraph:node=<name>` tag — `proc.tags` is empty by default
+for regular nodes (only `TAG_HIDDEN` is set for the START node).
