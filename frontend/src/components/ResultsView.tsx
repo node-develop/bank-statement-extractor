@@ -12,7 +12,7 @@ interface Props {
   filename?: string;
   pageCount?: number;
   wallClockText?: string;
-  costUsd?: number;
+  costUsd?: string;
   onReview: (period: PeriodResult) => void;
 }
 
@@ -87,7 +87,7 @@ export function ResultsView({
         <span>sha256:{result.statement_sha256.slice(0, 12)}…</span>
         {(wallClockText || costUsd !== undefined) && <span>·</span>}
         {wallClockText && <span>{wallClockText}</span>}
-        {costUsd !== undefined && <span>· ${costUsd.toFixed(4)}</span>}
+        {costUsd !== undefined && <span>· ${costUsd}</span>}
       </div>
 
       <div className="stat-strip" style={{ marginBottom: 24 }}>
