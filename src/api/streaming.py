@@ -157,6 +157,10 @@ async def stream_graph_events(
     step_emitted_running: set[str] = set()
     cumulative_cost: Decimal = Decimal("0")
     final_result: Any = None
+    # Collect errors[] reducer deltas across nodes so we can surface a
+    # specific failure reason when the graph terminates without a final
+    # (e.g. split_periods returning 0 chunks when ocr_text is empty).
+    collected_errors: list[str] = []
 
     try:
         async for ev in graph.astream_events(initial_state, config, version="v2"):
@@ -228,10 +232,35 @@ async def stream_graph_events(
                         "kind": "cost",
                         "cumulative_cost_usd": str(cumulative_cost.quantize(Decimal("0.0001"))),
                     }
+
+            # Harvest any `errors` reducer deltas the node emitted (rule 12).
+            if kind == "on_chain_end":
+                out = (ev.get("data") or {}).get("output")
+                if isinstance(out, dict):
+                    errs = out.get("errors")
+                    if isinstance(errs, list):
+                        collected_errors.extend(str(e) for e in errs)
     except Exception as exc:
         yield {"kind": "error", "message": str(exc)}
         yield {"kind": "done"}
         raise
+
+    # If the graph completed without producing a `final` ExtractResult
+    # (typically split_periods returned 0 chunks → fan-out dispatched 0
+    # Send objects → finalize never ran), surface a specific error event
+    # so the frontend's catch sees it and doesn't render a blank page on
+    # the implicit `setResult(null)`.
+    if final_result is None:
+        msg = (
+            "Graph completed without a final ExtractResult. "
+            "Most likely cause: no period chunks detected (OCR text required "
+            "for layouts that depend on regex anchors)."
+        )
+        if collected_errors:
+            msg += " Pipeline errors: " + "; ".join(collected_errors)
+        yield {"kind": "error", "message": msg}
+        yield {"kind": "done"}
+        return
 
     yield {"kind": "result", "result": _serialize_final(final_result)}
     yield {"kind": "done"}

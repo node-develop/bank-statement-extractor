@@ -234,6 +234,8 @@ body,
 
 /* ---------- Upload zone ---------- */
 .upload-zone {
+  display: block;
+  position: relative;
   background: var(--surface-1);
   border: 1.5px dashed var(--border-2);
   border-radius: var(--radius-4);
