@@ -432,3 +432,40 @@ def test_reconcile_output_order_follows_chunks() -> None:
     assert len(recs) == 2
     assert recs[0].chunk_id == id_a, "First entry must match first chunk"
     assert recs[1].chunk_id == id_b, "Second entry must match second chunk"
+
+
+def test_reconcile_count_sentinel_zero_skips_count_invariant() -> None:
+    """summary.deposits_count == 0 means "not printed by source statement"
+    (Chase / BofA / generic US-bank layouts).  Reconciler must skip the
+    count invariant in that case so balance-perfect statements reconcile.
+    """
+    from src.nodes.reconcile import reconcile
+
+    # Simulate a Chase-style summary: balance math is exact, but counts are 0.
+    summary = Summary(
+        chunk_id=_APR_CHUNK_ID,
+        beginning_balance=Decimal("48762.34"),
+        ending_balance=Decimal("73174.72"),
+        deposits_total=Decimal("110850.55"),
+        deposits_count=0,  # sentinel: count not printed in source
+        withdrawals_total=Decimal("86438.17"),
+        withdrawals_count=0,  # sentinel: count not printed
+    )
+    # 18 transactions split into 8 credits + 10 debits — counts don't match
+    # the summary's 0/0 sentinel, but reconciler should not flag.
+    credits = _build_synthetic_transactions(
+        _APR_CHUNK_ID, "credit", n=8, total=Decimal("110850.55")
+    )
+    debits = _build_synthetic_transactions(_APR_CHUNK_ID, "debit", n=10, total=Decimal("86438.17"))
+    state = _make_state(
+        chunks=[_make_chunk(_APR_CHUNK_ID)],
+        summaries=[summary],
+        transactions=credits + debits,
+    )
+    result = reconcile(state)
+    rec = result["reconciliations"][0]
+
+    assert rec.reconciled is True, (
+        f"balance is exact and counts are sentinels — should reconcile; got notes={rec.notes}"
+    )
+    assert rec.delta == Decimal("0.00")
