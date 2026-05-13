@@ -62,12 +62,11 @@ services:
         condition: service_healthy
     healthcheck:
       # Mirror the Dockerfile HEALTHCHECK so Compose knows when api is ready.
+      # Single-line python -c — YAML folding + leading whitespace would
+      # otherwise produce an IndentationError inside the container.
       test:
-        - "CMD-SHELL"
-        - >
-          python -c
-          "import urllib.request, sys;
-           sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=2).status == 200 else 1)"
+        - CMD-SHELL
+        - "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/healthz',timeout=2).status==200 else 1)\""
       interval: 10s
       timeout: 3s
       retries: 5
