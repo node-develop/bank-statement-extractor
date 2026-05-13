@@ -86,14 +86,15 @@ def _get_llm() -> Any:
     if _LLM_INSTANCE is None:
         from langchain_anthropic import ChatAnthropic
 
-        # max_tokens=32k — transaction lists can be long (Ixonia period_01
-        # has 192 transactions x ~150 tokens each = ~28k output tokens).
-        # 4096 truncates mid-array → structured output returns {} → empty
-        # transactions list (silent failure).  Sonnet 4.6 supports 64k out.
-        # timeout=180s — wall-clock time for a 30k-token completion.
+        # max_tokens=20k — cap output cost (Sonnet @ $15/M output).
+        # Empirical Ixonia worst case (period_06: 71+118=189 tx, period_02:
+        # 95+142=237 tx) fits in ~18k output tokens with the stripped
+        # _TransactionRow schema (no chunk_id; ~80 tok/row).  4096 was too
+        # tight and produced silent truncation; 32k overpaid.  timeout=180s
+        # remains for the longest periods.
         _LLM_INSTANCE = ChatAnthropic(  # type: ignore[call-arg]
             model="claude-sonnet-4-6",
-            max_tokens=32_000,
+            max_tokens=20_000,
             temperature=0,
             timeout=180,
         )
