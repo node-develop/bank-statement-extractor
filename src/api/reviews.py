@@ -36,9 +36,9 @@ def _default_db_path() -> Path:
     raises ``Read-only file system``.  Fall back to a cwd-relative path so
     tests never need to set ``REVIEWS_DB_PATH``.
     """
-    docker_path = Path("/app/data/reviews.sqlite")
-    if Path("/app").exists() and os.access("/app", os.W_OK):
-        return docker_path
+    docker_data = Path("/app/data")
+    if docker_data.exists() and os.access(docker_data, os.W_OK):
+        return docker_data / "reviews.sqlite"
     return Path("./reviews.sqlite")
 
 
