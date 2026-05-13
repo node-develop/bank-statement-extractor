@@ -1,0 +1,7 @@
+# NOTE: Docker reads .dockerignore from the build context root, not from the
+# directory containing the Dockerfile. Since all infra builds use context ".."
+# (the repository root), the effective .dockerignore is /.dockerignore at the
+# repo root. Edit that file, not this one.
+#
+# This file is intentionally a stub so the infra/ directory documents the
+# convention. See /.dockerignore for the actual exclusion list.

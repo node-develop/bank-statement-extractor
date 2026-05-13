@@ -1,0 +1,57 @@
+# bank-statement-analizer — multi-stage frontend Dockerfile.
+#
+# Stage 1: build the Vite + React + TS app with pnpm.
+# Stage 2: serve the static dist/ via nginx with an /api reverse proxy.
+#
+# Build context must be the repository root:
+#   docker build -f infra/Dockerfile.frontend -t bsa-frontend .
+
+# ---------------------------------------------------------------------------
+# Stage 1: builder — Node 22 LTS (current LTS as of 2026-05).
+# ---------------------------------------------------------------------------
+FROM node:22-alpine AS builder
+
+# Enable corepack so pnpm is available without a separate install step.
+# pnpm@10 is the current major at May 2026; corepack fetches the exact
+# version declared in package.json#packageManager if present, else latest.
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
+WORKDIR /app
+
+# ------------------------------------------------------------------
+# Cache layer: install deps before copying source.
+# pnpm store is mounted as a build cache so subsequent builds skip
+# network fetches when pnpm-lock.yaml is unchanged.
+# --frozen-lockfile = fail if pnpm-lock.yaml is out of date.
+# ------------------------------------------------------------------
+COPY frontend/package.json frontend/pnpm-lock.yaml ./
+
+RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
+    pnpm install --frozen-lockfile
+
+# Copy source and build.
+# VITE_API_BASE=/api tells the frontend to proxy API calls through nginx
+# at /api/ rather than hardcoding a host:port.
+COPY frontend/ ./
+
+RUN VITE_API_BASE=/api pnpm build
+
+# ---------------------------------------------------------------------------
+# Stage 2: runtime — nginx 1.27 Alpine (current stable at May 2026).
+# ---------------------------------------------------------------------------
+FROM nginx:1.27-alpine AS runtime
+
+# Remove default nginx config; ours replaces it.
+RUN rm /etc/nginx/conf.d/default.conf
+
+# Copy our nginx config and the built SPA.
+COPY infra/nginx.conf /etc/nginx/conf.d/bsa.conf
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+EXPOSE 80
+
+# Healthcheck: wget is available on nginx:alpine without extra packages.
+HEALTHCHECK --interval=10s --timeout=3s --retries=5 --start-period=5s \
+    CMD wget -qO- http://127.0.0.1/ > /dev/null || exit 1
+
+CMD ["nginx", "-g", "daemon off;"]

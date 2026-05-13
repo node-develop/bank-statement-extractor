@@ -1,20 +1,84 @@
 {
   "$schema": "https://dokploy.com/schemas/application/0.29.json",
-  "name": "bank-statement-analizer-api",
-  "applicationType": "dockerfile",
-  "dockerfilePath": "infra/Dockerfile",
-  "buildContext": ".",
-  "port": 8000,
-  "healthCheck": { "path": "/readyz", "interval": 30, "timeout": 5, "retries": 3 },
-  "livenessProbe": { "path": "/healthz" },
-  "env": {
-    "ANTHROPIC_API_KEY": "${secret:ANTHROPIC_API_KEY}",
-    "LANGSMITH_API_KEY": "${secret:LANGSMITH_API_KEY}",
-    "LANGSMITH_PROJECT": "bank-statement-analizer-prod",
-    "LANGSMITH_TRACING": "true",
-    "DATABASE_URL": "${service:postgres.url}",
-    "FRONTEND_ORIGIN": "${secret:FRONTEND_ORIGIN}"
-  },
-  "resources": { "memory": "1024Mi", "cpu": "500m" },
-  "notes": "Frontend is a separate Dokploy static-site app (build from frontend/dist)."
+
+  "applications": [
+    {
+      "name": "Bank Statement Analizer API",
+      "appName": "bank-statement-analizer-api",
+      "branch": "main",
+      "buildType": "dockerfile",
+      "dockerfilePath": "infra/Dockerfile",
+      "buildContext": ".",
+      "port": 8000,
+      "healthCheckPath": "/readyz",
+      "healthCheckPort": 8000,
+      "livenessPath": "/healthz",
+      "domains": [
+        {
+          "host": "${BSA_API_DOMAIN}",
+          "port": 8000,
+          "https": true,
+          "certificateType": "letsencrypt"
+        }
+      ],
+      "env": {
+        "LANGGRAPH_CHECKPOINTER": "postgres",
+        "LANGGRAPH_STRICT_MSGPACK": "true",
+        "LANGSMITH_TRACING": "false",
+        "ANTHROPIC_API_KEY":  "${ANTHROPIC_API_KEY}",
+        "LANGSMITH_API_KEY":  "${LANGSMITH_API_KEY}",
+        "LANGSMITH_PROJECT":  "${LANGSMITH_PROJECT}",
+        "DATABASE_URL":       "${DATABASE_URL}",
+        "FRONTEND_ORIGIN":    "${FRONTEND_ORIGIN}"
+      },
+      "resources": {
+        "memory": "1024Mi",
+        "cpu": "500m"
+      }
+    },
+    {
+      "name": "Bank Statement Analizer Frontend",
+      "appName": "bank-statement-analizer-frontend",
+      "branch": "main",
+      "buildType": "dockerfile",
+      "dockerfilePath": "infra/Dockerfile.frontend",
+      "buildContext": ".",
+      "port": 80,
+      "healthCheckPath": "/",
+      "healthCheckPort": 80,
+      "domains": [
+        {
+          "host": "${BSA_FRONTEND_DOMAIN}",
+          "port": 80,
+          "https": true,
+          "certificateType": "letsencrypt"
+        }
+      ],
+      "env": {
+        "VITE_API_BASE": "/api"
+      },
+      "resources": {
+        "memory": "256Mi",
+        "cpu": "100m"
+      }
+    }
+  ],
+
+  "databases": [
+    {
+      "name": "bank-statement-analizer-postgres",
+      "engine": "postgresql:16",
+      "databaseName": "bsa",
+      "username": "bsa",
+      "password": "${BSA_POSTGRES_PASSWORD}"
+    }
+  ],
+
+  "_notes": [
+    "TODO: Verify 'buildType' field name — Dokploy 0.29 docs use 'applicationType' in some places and 'buildType' in others. If the UI rejects this manifest, rename 'buildType' to 'applicationType'.",
+    "TODO: Verify 'livenessPath' field name — the SKILL.md example uses 'livenessProbe: {path}'. Rename to 'livenessProbe': {'path': '/healthz'} if the 0.29 schema validator rejects the flat form.",
+    "TODO: Verify 'certificateType' accepted values for your Dokploy host (common: 'letsencrypt', 'custom', 'none').",
+    "Set BSA_API_DOMAIN, BSA_FRONTEND_DOMAIN, BSA_POSTGRES_PASSWORD in Dokploy's project environment before first deploy.",
+    "FRONTEND_ORIGIN in the api application must match the scheme+host of BSA_FRONTEND_DOMAIN (CORS)."
+  ]
 }

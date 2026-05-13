@@ -1,26 +1,23 @@
-# Local dev / Dokploy-rendered compose.
-# Production secrets injected via Dokploy env mapping (see infra/dokploy.json).
-services:
-  api:
-    build:
-      context: ..
-      dockerfile: infra/Dockerfile
-    ports:
-      - "8000:8000"
-    environment:
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
-      LANGSMITH_API_KEY: ${LANGSMITH_API_KEY}
-      LANGSMITH_PROJECT: bank-statement-analizer-dev
-      LANGSMITH_TRACING: "true"
-      DATABASE_URL: postgresql://bsa:bsa@postgres:5432/bsa
-      FRONTEND_ORIGIN: http://localhost:5173
-    depends_on:
-      postgres:
-        condition: service_healthy
-    restart: unless-stopped
+# bank-statement-analizer — Compose v2 (no top-level "version:" key).
+# Project name: bsa  (set here so all resources get a consistent prefix)
+#
+# Usage (local):
+#   export ANTHROPIC_API_KEY=sk-ant-...
+#   docker compose -f infra/docker-compose.yml up --build
+#
+# Production: Dokploy renders this file on the host, injecting secrets via
+# the env mapping defined in infra/dokploy.json.
 
+name: bsa
+
+services:
+
+  # --------------------------------------------------------------------------
+  # postgres — LangGraph checkpoint store.
+  # --------------------------------------------------------------------------
   postgres:
     image: postgres:16-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_USER: bsa
       POSTGRES_PASSWORD: bsa
@@ -32,6 +29,70 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
+
+  # --------------------------------------------------------------------------
+  # api — FastAPI + LangGraph extraction service.
+  # --------------------------------------------------------------------------
+  api:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      # Checkpointer — use Postgres in compose (SQLite is for local dev only)
+      LANGGRAPH_CHECKPOINTER: postgres
+      DATABASE_URL: postgresql://bsa:bsa@postgres:5432/bsa
+      LANGGRAPH_STRICT_MSGPACK: "true"
+
+      # Anthropic — required; supply via shell env or .env file (never commit)
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+
+      # LangSmith — optional tracing; defaults to off
+      LANGSMITH_API_KEY: ${LANGSMITH_API_KEY:-}
+      LANGSMITH_PROJECT: ${LANGSMITH_PROJECT:-bank-statement-analizer-dev}
+      LANGSMITH_TRACING: ${LANGSMITH_TRACING:-false}
+
+      # CORS — allow the frontend container on port 80
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      # Mirror the Dockerfile HEALTHCHECK so Compose knows when api is ready.
+      test:
+        - "CMD-SHELL"
+        - >
+          python -c
+          "import urllib.request, sys;
+           sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=2).status == 200 else 1)"
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
+
+  # --------------------------------------------------------------------------
+  # frontend — Vite SPA served by nginx with /api/ reverse proxy to api.
+  # --------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ > /dev/null || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
 
 volumes:
-  bsa_pgdata: {}
+  bsa_pgdata:
+    name: bsa_pgdata
