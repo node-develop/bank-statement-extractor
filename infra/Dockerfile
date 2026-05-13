@@ -1,8 +1,8 @@
 # bank-statement-analizer — multi-stage backend Dockerfile.
 #
-# NOTE: pyproject.toml requires Python >=3.14, which is alpha as of 2026-05.
-# Pin to python:3.13-slim until python:3.14-slim ships an official image.
-# Bump base tags in one PR; search for "3.13-slim" in this file.
+# Base: python:3.14-slim — matches pyproject.toml requires-python and the
+# lockfile's resolved interpreter.  python:3.14-slim has been on Docker Hub
+# since late 2025 (Python 3.14.0 released 2025-10-07).
 #
 # Build context must be the repository root:
 #   docker build -f infra/Dockerfile -t bsa-api .
@@ -13,7 +13,7 @@
 # separately from Python. Pin to a specific digest in prod (see TODO below).
 # TODO: pin uv to digest in production, e.g. ghcr.io/astral-sh/uv:0.5.x@sha256:...
 # ---------------------------------------------------------------------------
-FROM python:3.13-slim AS builder
+FROM python:3.14-slim AS builder
 
 # Pull the uv binary from the official image (no pip install required).
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
@@ -61,7 +61,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # ---------------------------------------------------------------------------
 # Stage 2: runtime — minimal image, no build tools, no uv binary.
 # ---------------------------------------------------------------------------
-FROM python:3.13-slim AS runtime
+FROM python:3.14-slim AS runtime
 
 # libpq5   — shared library required by psycopg[binary] at runtime.
 # tini     — minimal init (PID 1 reaper) so SIGTERM propagates correctly.
