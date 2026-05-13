@@ -1,0 +1,163 @@
+{
+  "stmt_01_apex_chase": {
+    "quality_level": "clean_digital",
+    "ocr_chars": 2142,
+    "n_transactions": 18,
+    "tx_found": 18,
+    "tx_missing": 0,
+    "tx_recall": 1.0,
+    "anchors": {
+      "bank_name": true,
+      "account_holder": true,
+      "period_label": true,
+      "opening_balance": true,
+      "ending_balance": true
+    },
+    "missing_descriptions": []
+  },
+  "stmt_02_riverstone_bofa": {
+    "quality_level": "clean_digital_multipage",
+    "ocr_chars": 3384,
+    "n_transactions": 27,
+    "tx_found": 27,
+    "tx_missing": 0,
+    "tx_recall": 1.0,
+    "anchors": {
+      "bank_name": true,
+      "account_holder": true,
+      "period_label": true,
+      "opening_balance": true,
+      "ending_balance": true
+    },
+    "missing_descriptions": []
+  },
+  "stmt_03_greenfield_wellsfargo": {
+    "quality_level": "scanned_clean",
+    "ocr_chars": 2085,
+    "n_transactions": 17,
+    "tx_found": 17,
+    "tx_missing": 0,
+    "tx_recall": 1.0,
+    "anchors": {
+      "bank_name": true,
+      "account_holder": true,
+      "period_label": true,
+      "opening_balance": true,
+      "ending_balance": true
+    },
+    "missing_descriptions": []
+  },
+  "stmt_04_mountainpeak_pnc": {
+    "quality_level": "scanned_low_quality",
+    "ocr_chars": 1836,
+    "n_transactions": 14,
+    "tx_found": 14,
+    "tx_missing": 0,
+    "tx_recall": 1.0,
+    "anchors": {
+      "bank_name": true,
+      "account_holder": true,
+      "period_label": true,
+      "opening_balance": true,
+      "ending_balance": true
+    },
+    "missing_descriptions": []
+  },
+  "stmt_05_aurora_firstpacific": {
+    "quality_level": "scanned_degraded",
+    "ocr_chars": 1770,
+    "n_transactions": 20,
+    "tx_found": 0,
+    "tx_missing": 20,
+    "tx_recall": 0.0,
+    "anchors": {
+      "bank_name": false,
+      "account_holder": false,
+      "period_label": false,
+      "opening_balance": false,
+      "ending_balance": true
+    },
+    "missing_descriptions": [
+      {
+        "description": "INCOMING WIRE - SHENZHEN GOLDEN PORT CO LTD",
+        "match_ratio": 0.286
+      },
+      {
+        "description": "ACH PAYMENT - UPS FREIGHT BILL 88412",
+        "match_ratio": 0.167
+      },
+      {
+        "description": "ACH PAYMENT - C.H. ROBINSON WORLDWIDE INC",
+        "match_ratio": 0.167
+      },
+      {
+        "description": "ACH CREDIT - WESTBROOK DISTRIBUTION INC INV 4421",
+        "match_ratio": 0.143
+      },
+      {
+        "description": "ACH PAYMENT - LIVINGSTON INTERNATIONAL CUSTOMS",
+        "match_ratio": 0.2
+      },
+      {
+        "description": "CHECK 2841 - PROLOGIS INC RENT JAN",
+        "match_ratio": 0.333
+      },
+      {
+        "description": "DEPOSIT - WIRE FROM YOKOHAMA TEXTILE GROUP",
+        "match_ratio": 0.0
+      },
+      {
+        "description": "PAYROLL ACH - INTUIT QUICKBOOKS PAYROLL",
+        "match_ratio": 0.25
+      },
+      {
+        "description": "ACH PAYMENT - FEDEX FREIGHT 884-22",
+        "match_ratio": 0.2
+      },
+      {
+        "description": "INCOMING WIRE - PACIFIC RIM IMPORTERS LLC",
+        "match_ratio": 0.167
+      },
+      {
+        "description": "ACH PAYMENT - AMERICAN EXPRESS CORP CARD 88241",
+        "match_ratio": 0.286
+      },
+      {
+        "description": "ACH PAYMENT - ICE INDUSTRIAL EXCHANGE WAREHOUSE",
+        "match_ratio": 0.167
+      },
+      {
+        "description": "ACH CREDIT - NEWBROOK TRADING CO PMT 88412",
+        "match_ratio": 0.143
+      },
+      {
+        "description": "ACH PAYMENT - SOUTHERN CALIFORNIA EDISON",
+        "match_ratio": 0.2
+      },
+      {
+        "description": "PAYROLL ACH - INTUIT QUICKBOOKS PAYROLL",
+        "match_ratio": 0.25
+      },
+      {
+        "description": "ACH PAYMENT - HARTFORD MARINE INSURANCE POL 8841",
+        "match_ratio": 0.143
+      },
+      {
+        "description": "DEPOSIT - CHECK #4128 NEWBROOK TRADING",
+        "match_ratio": 0.2
+      },
+      {
+        "description": "WIRE TRANSFER OUT - GUANGZHOU SUPPLY HOLDINGS",
+        "match_ratio": 0.333
+      },
+      {
+        "description": "WIRE TRANSFER FEE",
+        "match_ratio": 0.333
+      },
+      {
+        "description": "ANALYSIS SERVICE CHARGE",
+        "match_ratio": 0.333
+      }
+    ]
+  }
+}

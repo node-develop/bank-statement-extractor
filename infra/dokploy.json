@@ -21,14 +21,21 @@
           "certificateType": "letsencrypt"
         }
       ],
+      "volumes": [
+        {
+          "name": "bsa_data",
+          "mountPath": "/app/data",
+          "comment": "SQLite checkpoint store; persisted across deploys."
+        }
+      ],
       "env": {
-        "LANGGRAPH_CHECKPOINTER": "postgres",
+        "LANGGRAPH_CHECKPOINTER": "sqlite",
+        "LANGGRAPH_SQLITE_PATH": "/app/data/graph.sqlite",
         "LANGGRAPH_STRICT_MSGPACK": "true",
         "LANGSMITH_TRACING": "false",
         "ANTHROPIC_API_KEY":  "${ANTHROPIC_API_KEY}",
         "LANGSMITH_API_KEY":  "${LANGSMITH_API_KEY}",
         "LANGSMITH_PROJECT":  "${LANGSMITH_PROJECT}",
-        "DATABASE_URL":       "${DATABASE_URL}",
         "FRONTEND_ORIGIN":    "${FRONTEND_ORIGIN}"
       },
       "resources": {
@@ -64,21 +71,12 @@
     }
   ],
 
-  "databases": [
-    {
-      "name": "bank-statement-analizer-postgres",
-      "engine": "postgresql:16",
-      "databaseName": "bsa",
-      "username": "bsa",
-      "password": "${BSA_POSTGRES_PASSWORD}"
-    }
-  ],
-
   "_notes": [
     "TODO: Verify 'buildType' field name — Dokploy 0.29 docs use 'applicationType' in some places and 'buildType' in others. If the UI rejects this manifest, rename 'buildType' to 'applicationType'.",
     "TODO: Verify 'livenessPath' field name — the SKILL.md example uses 'livenessProbe: {path}'. Rename to 'livenessProbe': {'path': '/healthz'} if the 0.29 schema validator rejects the flat form.",
     "TODO: Verify 'certificateType' accepted values for your Dokploy host (common: 'letsencrypt', 'custom', 'none').",
-    "Set BSA_API_DOMAIN, BSA_FRONTEND_DOMAIN, BSA_POSTGRES_PASSWORD in Dokploy's project environment before first deploy.",
+    "Storage: SQLite checkpoint under /app/data — Dokploy must back the named volume 'bsa_data' with persistent storage so reconciliation state survives a redeploy.",
+    "Set BSA_API_DOMAIN and BSA_FRONTEND_DOMAIN in Dokploy's project environment before first deploy.",
     "FRONTEND_ORIGIN in the api application must match the scheme+host of BSA_FRONTEND_DOMAIN (CORS)."
   ]
 }

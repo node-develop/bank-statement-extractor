@@ -88,9 +88,16 @@ def client_with_mock_graph(monkeypatch: pytest.MonkeyPatch) -> Any:
         "src.api.main.build_graph",
         lambda checkpointer=None: fake_graph,
     )
+
+    async def _fake_async_checkpointer() -> tuple[MagicMock, Any]:
+        async def _noop() -> None:
+            return None
+
+        return MagicMock(), _noop
+
     monkeypatch.setattr(
-        "src.api.main.build_checkpointer",
-        lambda: (MagicMock(), lambda: None),
+        "src.api.main.build_async_checkpointer",
+        _fake_async_checkpointer,
     )
 
     app = api_main.create_app()
@@ -220,9 +227,16 @@ def test_extract_pdf_unreadable_returns_422(monkeypatch: pytest.MonkeyPatch) -> 
         "src.api.main.build_graph",
         lambda checkpointer=None: fake_graph,
     )
+
+    async def _fake_async_checkpointer() -> tuple[MagicMock, Any]:
+        async def _noop() -> None:
+            return None
+
+        return MagicMock(), _noop
+
     monkeypatch.setattr(
-        "src.api.main.build_checkpointer",
-        lambda: (MagicMock(), lambda: None),
+        "src.api.main.build_async_checkpointer",
+        _fake_async_checkpointer,
     )
 
     app = api_main.create_app()
@@ -261,9 +275,16 @@ def test_readyz_returns_503_without_key(monkeypatch: pytest.MonkeyPatch) -> None
         "src.api.main.build_graph",
         lambda checkpointer=None: MagicMock(),
     )
+
+    async def _fake_async_checkpointer() -> tuple[MagicMock, Any]:
+        async def _noop() -> None:
+            return None
+
+        return MagicMock(), _noop
+
     monkeypatch.setattr(
-        "src.api.main.build_checkpointer",
-        lambda: (MagicMock(), lambda: None),
+        "src.api.main.build_async_checkpointer",
+        _fake_async_checkpointer,
     )
 
     app = api_main.create_app()
@@ -288,9 +309,16 @@ def test_readyz_returns_200_with_key(monkeypatch: pytest.MonkeyPatch) -> None:
         "src.api.main.build_graph",
         lambda checkpointer=None: MagicMock(),
     )
+
+    async def _fake_async_checkpointer() -> tuple[MagicMock, Any]:
+        async def _noop() -> None:
+            return None
+
+        return MagicMock(), _noop
+
     monkeypatch.setattr(
-        "src.api.main.build_checkpointer",
-        lambda: (MagicMock(), lambda: None),
+        "src.api.main.build_async_checkpointer",
+        _fake_async_checkpointer,
     )
 
     app = api_main.create_app()

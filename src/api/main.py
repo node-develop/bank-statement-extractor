@@ -34,7 +34,7 @@ from fastapi.responses import JSONResponse
 from src.api.logging import get_logger
 from src.api.routers.extract import router as extract_router
 from src.graph.builder import build_graph
-from src.graph.checkpointer import build_checkpointer
+from src.graph.checkpointer import build_async_checkpointer
 
 logger = get_logger(__name__)
 
@@ -46,19 +46,23 @@ logger = get_logger(__name__)
 
 @asynccontextmanager
 async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """Open the checkpointer connection and compile the graph on startup.
+    """Open the async checkpointer and compile the graph on startup.
 
-    Runs ``teardown()`` on shutdown so the underlying SQLite / Postgres
-    connection is closed cleanly even when the server receives SIGTERM.
+    We use the async checkpointer variant (AsyncPostgresSaver /
+    AsyncSqliteSaver) so ``await graph.ainvoke(...)`` in the /extract
+    endpoint can issue real awaits on the checkpoint backend.  The sync
+    PostgresSaver does NOT implement aget_tuple and would NotImplementedError
+    on the first checkpoint read; see src/graph/checkpointer.py
+    build_async_checkpointer for the docstring reference.
     """
-    saver, teardown = build_checkpointer()
+    saver, teardown = await build_async_checkpointer()
     app.state.checkpointer = saver
     app.state.graph = build_graph(checkpointer=saver)
-    logger.info("lifespan: checkpointer ready, graph compiled")
+    logger.info("lifespan: async checkpointer ready, graph compiled")
     try:
         yield
     finally:
-        teardown()
+        await teardown()
         logger.info("lifespan: checkpointer connection closed")
 
 
