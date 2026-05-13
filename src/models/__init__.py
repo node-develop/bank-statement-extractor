@@ -35,14 +35,18 @@ __all__ = [
     "EPSILON",
     "Account",
     "ExtractResult",
+    "Gap",
     "LayoutLabel",
+    "PendingReview",
     "Period",
     "PeriodChunk",
     "PeriodResult",
     "RawStatement",
     "Reconciliation",
     "Summary",
+    "Suspect",
     "Transaction",
+    "VerifierReport",
 ]
 
 # ---------------------------------------------------------------------------
@@ -303,6 +307,83 @@ class LayoutLabel(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Verifier models (Phase 2)
+# ---------------------------------------------------------------------------
+class Suspect(BaseModel):
+    """A single row-level anomaly detected by the deterministic verifier."""
+
+    model_config = _VALUE_CFG
+
+    chunk_id: str
+    row_index: int  # 0-based within the chunk's tx list
+    code: Literal[
+        "balance_chain_break",
+        "date_order",
+        "duplicate_row",
+        "empty_description",
+        "zero_amount",
+        "summary_delta",
+    ]
+    reason: str = Field(max_length=200)
+    expected: str | None = None
+    actual: str | None = None
+
+
+class Gap(BaseModel):
+    """A detected gap in the running-balance chain between two rows."""
+
+    model_config = _VALUE_CFG
+
+    chunk_id: str
+    after_row_index: int  # gap appears between row N and N+1
+    date_range: tuple[date, date]
+    missing_amount: Decimal  # signed; positive = missing credit, negative = missing debit
+
+    @field_validator("missing_amount", mode="before")
+    @classmethod
+    def _coerce(cls, v: object) -> Decimal:
+        return _coerce_to_decimal(v, "missing_amount")
+
+    @field_serializer("missing_amount")
+    def _ser(self, v: Decimal) -> str:
+        return str(v)
+
+    @field_serializer("date_range")
+    def _ser_dr(self, v: tuple[date, date]) -> tuple[str, str]:
+        return (v[0].isoformat(), v[1].isoformat())
+
+
+class VerifierReport(BaseModel):
+    """Outcome of the deterministic C1-C6 verification for one period chunk."""
+
+    model_config = _VALUE_CFG
+
+    chunk_id: str
+    confidence: Decimal  # 0..1, quantized to 2dp
+    suspects: list[Suspect]
+    gaps: list[Gap]
+
+    @field_validator("confidence", mode="before")
+    @classmethod
+    def _coerce(cls, v: object) -> Decimal:
+        return _coerce_to_decimal(v, "confidence")
+
+    @field_serializer("confidence")
+    def _ser(self, v: Decimal) -> str:
+        return str(v)
+
+
+class PendingReview(BaseModel):
+    """Surfaced on ExtractResult when the graph paused via interrupt()."""
+
+    model_config = _VALUE_CFG
+
+    extraction_id: str
+    reason: Literal["suspects_exceeded", "cost_ceiling_exceeded", "retry_exhausted"]
+    suspect_count: int = Field(ge=0)
+
+
+# ---------------------------------------------------------------------------
 # PeriodResult
 # ---------------------------------------------------------------------------
 class PeriodResult(BaseModel):
@@ -316,6 +397,7 @@ class PeriodResult(BaseModel):
     transactions: list[Transaction]
     layout: str
     reconciliation: Reconciliation
+    verifier: VerifierReport | None = None  # Phase 2 — None if verifier didn't run
 
 
 # ---------------------------------------------------------------------------
@@ -330,3 +412,4 @@ class ExtractResult(BaseModel):
     statement_sha256: str
     langsmith_run_url: str | None = None
     errors: list[str] = Field(default_factory=list)
+    pending_review: PendingReview | None = None  # Phase 2 — None on the happy path

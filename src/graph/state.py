@@ -39,6 +39,7 @@ from src.models import (  # noqa: TC001 — runtime-required by LangGraph TypedD
     Reconciliation,
     Summary,
     Transaction,
+    VerifierReport,
 )
 
 # Note on ``pending_hint``: the real runtime type is
@@ -130,3 +131,6 @@ class GraphState(TypedDict):
     errors: Annotated[list[str], operator.add]
     pending_hint: NotRequired[Any]
     final: NotRequired[ExtractResult]
+    # Phase 2 — verifier reports, one per chunk_id. ``_reduce_by_chunk_id`` so
+    # that re-extraction passes (Phase 3 critic loop) overwrite, not append.
+    verifier_reports: Annotated[list[VerifierReport], _reduce_by_chunk_id]
