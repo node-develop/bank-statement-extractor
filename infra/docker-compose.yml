@@ -35,6 +35,11 @@ services:
       # Anthropic — required; supply via .env or shell (never commit secrets).
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
 
+      # HITL threshold override (default 3). Set to 0 to force any non-clean
+      # extraction into await_review so the review modal is reachable on
+      # small fixtures during testing.
+      BSA_AWAIT_REVIEW_SUSPECTS: ${BSA_AWAIT_REVIEW_SUSPECTS:-3}
+
       # LangSmith — optional tracing; defaults to off.
       LANGSMITH_API_KEY: ${LANGSMITH_API_KEY:-}
       LANGSMITH_PROJECT: ${LANGSMITH_PROJECT:-bank-statement-analizer-dev}

@@ -108,6 +108,8 @@ def route_after_verifier(state: GraphState) -> str:
     str
         One of ``"reconcile"``, ``"critic"``, or ``"await_review"``.
     """
+    import os
+
     from src.api.pricing import HARD_COST_CAP_USD
 
     reports = state.get("verifier_reports", [])
@@ -115,10 +117,18 @@ def route_after_verifier(state: GraphState) -> str:
     retry = state.get("retry_count", 0)
     cost_capped = state.get("cumulative_cost_usd", Decimal("0")) >= HARD_COST_CAP_USD
 
+    # Hard threshold for routing straight to await_review (HITL).  Default 3
+    # is the production setting; override via env to test the HITL path on
+    # any fixture (BSA_AWAIT_REVIEW_SUSPECTS=0 makes ANY non-clean run pause).
+    try:
+        suspects_threshold = int(os.environ.get("BSA_AWAIT_REVIEW_SUSPECTS", "3"))
+    except ValueError:
+        suspects_threshold = 3
+
     if total_suspects == 0 and not cost_capped:
         logger.info("route_after_verifier: clean — routing to reconcile")
         return "reconcile"
-    if cost_capped or total_suspects > 3 or retry >= 2:
+    if cost_capped or total_suspects > suspects_threshold or retry >= 2:
         logger.info(
             "route_after_verifier: routing to await_review "
             "(cost_capped=%s, total_suspects=%d, retry=%d)",

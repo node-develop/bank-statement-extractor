@@ -251,13 +251,18 @@ async def stream_graph_events(
     # so the frontend's catch sees it and doesn't render a blank page on
     # the implicit `setResult(null)`.
     if final_result is None:
-        msg = (
-            "Graph completed without a final ExtractResult. "
-            "Most likely cause: no period chunks detected (OCR text required "
-            "for layouts that depend on regex anchors)."
-        )
-        if collected_errors:
-            msg += " Pipeline errors: " + "; ".join(collected_errors)
+        # Dedupe while preserving order — reducer-collected errors[] often
+        # propagate the same string across multiple node deltas.
+        dedup = list(dict.fromkeys(collected_errors))
+        if dedup:
+            # Specific pipeline errors are more actionable than a generic
+            # "graph terminated" message; show only those.
+            msg = "; ".join(dedup)
+        else:
+            msg = (
+                "Graph completed without a final ExtractResult. "
+                "Most likely cause: no period chunks detected."
+            )
         yield {"kind": "error", "message": msg}
         yield {"kind": "done"}
         return

@@ -213,15 +213,15 @@ def test_split_periods_two_line_account() -> None:
     assert chunks[0].account_hint_last4 == "1664"
 
 
-def test_split_periods_none_ocr_text_and_no_pages_returns_empty() -> None:
-    """No OCR and no pdfplumber text → empty chunks + specific error."""
+def test_split_periods_image_based_pdf_emits_actionable_error() -> None:
+    """Image-based PDF (pdfplumber returns 0 chars) gets a user-facing error."""
     from src.nodes.split_periods import split_periods
 
     # _make_state default `pages=[""]` simulates pdfplumber returning nothing.
     result = split_periods(_make_state(None))
     assert result["period_chunks"] == []
-    assert any("pdfplumber pages have no text" in e for e in result["errors"]), (
-        f"Expected pdfplumber-no-text error, got {result['errors']}"
+    assert any("image-based" in e for e in result["errors"]), (
+        f"Expected 'image-based' error, got {result['errors']}"
     )
 
 
@@ -231,11 +231,11 @@ def test_split_periods_empty_ocr_text_and_no_pages_returns_empty() -> None:
 
     result = split_periods(_make_state("   \n  "))
     assert result["period_chunks"] == []
-    assert any("pdfplumber pages have no text" in e for e in result["errors"])
+    assert any("image-based" in e for e in result["errors"])
 
 
 def test_split_periods_falls_back_to_pdfplumber_pages_when_no_ocr() -> None:
-    """No OCR but pdfplumber pages have real text → 1 whole-doc chunk."""
+    """No OCR but pdfplumber pages have real text → 1 whole-doc chunk, no error noise."""
     from src.nodes.split_periods import split_periods
 
     pages = [
@@ -247,11 +247,10 @@ def test_split_periods_falls_back_to_pdfplumber_pages_when_no_ocr() -> None:
     assert len(chunks) == 1, f"Expected 1 fallback chunk, got {len(chunks)}: {chunks}"
     assert chunks[0].chunk_id == "period_01"
     assert chunks[0].account_hint_last4 == "1234"
-    # Fallback uses joined-page text as the ocr_slice
     assert "Bank of Example" in (chunks[0].ocr_slice or "")
-    # An informational note is appended; not a fatal error.
-    assert any("no OCR text supplied" in e for e in result["errors"]), (
-        f"Expected 'no OCR text supplied' note, got {result['errors']}"
+    # Fallback success is informational only — must NOT emit a user-facing error.
+    assert result["errors"] == [], (
+        f"Successful fallback should produce no errors, got {result['errors']}"
     )
 
 
