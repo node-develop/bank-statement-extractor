@@ -16,7 +16,7 @@ Re-exports:
 from __future__ import annotations
 
 from decimal import ROUND_HALF_UP, Decimal
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import (
     BaseModel,
@@ -46,6 +46,7 @@ __all__ = [
     "Summary",
     "Suspect",
     "Transaction",
+    "TransactionCorrection",
     "VerifierReport",
 ]
 
@@ -381,6 +382,27 @@ class PendingReview(BaseModel):
     extraction_id: str
     reason: Literal["suspects_exceeded", "cost_ceiling_exceeded", "retry_exhausted"]
     suspect_count: int = Field(ge=0)
+
+
+class TransactionCorrection(BaseModel):
+    """One human-supplied row-level correction (Phase 4 — PRD §5.2).
+
+    ``action="edit"`` updates fields on row ``row_index``;
+    ``action="insert"`` injects a new row at ``row_index`` (use -1 for end);
+    ``action="delete"`` removes row ``row_index``.
+
+    ``fields`` is loosely typed so the API layer can accept any of: date,
+    description, amount, direction, running_balance.  The downstream
+    ``apply_human_corrections`` node passes them through to the extractor
+    as a natural-language hint block, NOT as a strict schema.
+    """
+
+    model_config = ConfigDict(strict=False, frozen=False)
+
+    chunk_id: str
+    row_index: int  # -1 = insert at end
+    action: Literal["edit", "insert", "delete"]
+    fields: dict[str, Any] = Field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------
