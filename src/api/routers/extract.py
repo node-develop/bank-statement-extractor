@@ -44,12 +44,14 @@ def _build_partial_periods_on_pause(
     """Assemble PeriodResult objects from state when the graph paused at
     ``await_review`` (rule 12 — surface what we have, never silently empty).
 
-    For every period_chunk that has account+summary+layout extracted, we
-    emit a PeriodResult with a placeholder ``Reconciliation`` marking
-    ``reconciled=False`` and a note explaining the pause.  Verifier output
-    is attached when present so the frontend can render per-row suspects.
+    Runs the pure-Python ``reconcile`` node on the partial state so each
+    PeriodResult carries the real Reconciliation (reconciled=True with
+    delta=0 when counts and totals match, reconciled=False with specific
+    notes when they don't).  Previously every period was stamped
+    ``reconciled=False`` regardless — the frontend rendered all 10 chunks
+    in the ReviewModal even when only one chunk had verifier suspects.
     """
-    from decimal import Decimal
+    from src.nodes.reconcile import reconcile as reconcile_node
 
     chunks = state.get("period_chunks", []) or []
     accounts = {a.chunk_id: a for a in state.get("accounts", []) or []}
@@ -59,6 +61,18 @@ def _build_partial_periods_on_pause(
     txs_by_chunk: dict[str, list[Any]] = {}
     for t in state.get("transactions", []) or []:
         txs_by_chunk.setdefault(t.chunk_id, []).append(t)
+
+    # Run the deterministic reconcile node on the partial state to compute
+    # per-chunk Reconciliation. reconcile_node returns {"reconciliations": [...]}.
+    rec_state = {
+        "period_chunks": chunks,
+        "summaries": list(state.get("summaries", []) or []),
+        "transactions": list(state.get("transactions", []) or []),
+    }
+    rec_delta = reconcile_node(rec_state)  # type: ignore[arg-type]
+    recs_by_id: dict[str, Reconciliation] = {
+        r.chunk_id: r for r in rec_delta.get("reconciliations", [])
+    }
 
     out: list[PeriodResult] = []
     for chunk in chunks:
@@ -74,12 +88,7 @@ def _build_partial_periods_on_pause(
                 summary=summaries[cid],
                 transactions=txs_by_chunk.get(cid, []),
                 layout=layout_str,
-                reconciliation=Reconciliation(
-                    chunk_id=cid,
-                    reconciled=False,
-                    delta=Decimal("0.00"),
-                    notes=["paused at await_review before reconcile could run"],
-                ),
+                reconciliation=recs_by_id[cid],
                 verifier=verifier_reports.get(cid),
             )
         )
