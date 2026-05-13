@@ -209,12 +209,33 @@ def run_real(pdf_path: str, txt_path: str | None) -> ExtractResult:
     config: dict[str, Any] = {"recursion_limit": 50}
     final_state = graph.invoke(initial, config=config)
     final = final_state.get("final")
-    if not isinstance(final, ExtractResult):
+    if isinstance(final, ExtractResult):
+        return final
+
+    # HITL pause path — graph stopped at await_review without reaching
+    # finalize. Synthesize an ExtractResult from the partial state so the
+    # report renders per-period reconciliation against the etalon. The graph
+    # itself is unchanged; this only rescues the eval harness from a hard
+    # crash when the system honestly says "I need a human" mid-run.
+    from src.nodes.finalize import finalize as finalize_node
+    from src.nodes.reconcile import reconcile as reconcile_node
+
+    if not final_state.get("summaries") or not final_state.get("transactions"):
         raise RuntimeError(
-            "graph did not produce an ExtractResult in state['final'] — "
-            "check that finalize ran and populated it"
+            "graph paused before producing summaries/transactions — no partial state to finalize"
         )
-    return final
+    logger.warning(
+        "real run: graph paused at await_review; running reconcile + finalize on partial state",
+    )
+    reconcile_delta = reconcile_node(final_state)
+    final_state["reconciliations"] = list(reconcile_delta["reconciliations"])
+    finalize_delta = finalize_node(final_state)
+    rescued = finalize_delta["final"]
+    if not isinstance(rescued, ExtractResult):
+        raise RuntimeError(
+            "rescue path: finalize did not produce an ExtractResult on partial state"
+        )
+    return rescued
 
 
 # ---------------------------------------------------------------------------
