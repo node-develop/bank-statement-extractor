@@ -1,282 +1,261 @@
-/**
- * ReviewModal — opens when ExtractResult.pending_review is non-null.
- *
- * Lets the user inspect each verifier suspect, edit the offending row's
- * fields inline, and submit corrections (or force-finalise the partial
- * result as-is).
- */
-
-import type React from "react";
-import { useEffect, useState } from "react";
-import { ApiError, getReview, submitReview } from "../api";
-import type { ExtractResult, PendingReview, Suspect, TransactionCorrection } from "../types";
+import { Fragment, useState } from "react";
+import { fmt$ } from "../lib/agentSteps";
+import type { PeriodResult, Suspect, TransactionCorrection } from "../types";
+import { IconAlert, IconCheck, IconRefresh, IconXCircle } from "./icons";
+import { Button } from "./ui/Button";
+import { Chip } from "./ui/Chip";
 
 interface Props {
-  pending: PendingReview;
-  onResolved: (result: ExtractResult) => void;
-  onError: (message: string) => void;
+  period: PeriodResult;
+  /** When the pause carries a reason; defaults to "suspects_exceeded". */
+  pauseReason?: "suspects_exceeded" | "cost_ceiling_exceeded" | "retry_exhausted";
+  /** When provided, used as the source-of-truth suspect list. Otherwise reads period.verifier.suspects. */
+  suspects?: Suspect[];
+  /** True when a submission is in-flight. */
+  busy?: boolean;
+  onClose: () => void;
+  onSubmit: (corrections: TransactionCorrection[], force: boolean) => void | Promise<void>;
 }
 
-const REASON_LABEL: Record<PendingReview["reason"], string> = {
-  suspects_exceeded: "Too many verifier suspects (>3) on this statement.",
+interface EditEntry {
+  fields: Record<string, string>;
+  del: boolean;
+}
+
+const REASON_LABEL = {
+  suspects_exceeded: "Too many verifier suspects in this period.",
   cost_ceiling_exceeded: "LLM cost ceiling reached before extraction completed.",
   retry_exhausted: "Critic retries exhausted without resolution.",
-};
+} as const;
 
-interface SuspectEdit {
-  /** Local form state per suspect — fields the user has typed. */
-  fields: Record<string, string>;
-  /** Whether to drop the row entirely. */
-  shouldDelete: boolean;
-}
+export function ReviewModal({
+  period,
+  pauseReason = "suspects_exceeded",
+  suspects,
+  busy,
+  onClose,
+  onSubmit,
+}: Props) {
+  const list = suspects ?? period.verifier?.suspects ?? [];
+  const [edits, setEdits] = useState<Record<string, EditEntry>>({});
 
-export function ReviewModal({ pending, onResolved, onError }: Props): React.JSX.Element {
-  const [suspects, setSuspects] = useState<Suspect[]>([]);
-  const [edits, setEdits] = useState<Record<string, SuspectEdit>>({});
-  const [submitting, setSubmitting] = useState(false);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    getReview(pending.extraction_id)
-      .then((data) => {
-        if (cancelled) return;
-        const list = (data.review_payload?.suspects ?? []) as Suspect[];
-        setSuspects(list);
-        setLoading(false);
-      })
-      .catch((err: unknown) => {
-        const msg = err instanceof ApiError ? err.message : String(err);
-        onError(msg);
-        setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [pending.extraction_id, onError]);
-
-  const suspectKey = (s: Suspect): string => `${s.chunk_id}:${s.row_index}`;
-
-  function updateField(s: Suspect, field: string, value: string): void {
-    setEdits((prev) => {
-      const key = suspectKey(s);
-      const existing = prev[key] ?? { fields: {}, shouldDelete: false };
-      return {
-        ...prev,
-        [key]: {
-          ...existing,
-          fields: { ...existing.fields, [field]: value },
-        },
-      };
+  const setField = (key: string, field: string, val: string) => {
+    setEdits((p) => {
+      const existing = p[key] ?? { fields: {}, del: false };
+      return { ...p, [key]: { ...existing, fields: { ...existing.fields, [field]: val } } };
     });
-  }
-
-  function toggleDelete(s: Suspect): void {
-    setEdits((prev) => {
-      const key = suspectKey(s);
-      const existing = prev[key] ?? { fields: {}, shouldDelete: false };
-      return {
-        ...prev,
-        [key]: { ...existing, shouldDelete: !existing.shouldDelete },
-      };
+  };
+  const toggleDel = (key: string) => {
+    setEdits((p) => {
+      const existing = p[key] ?? { fields: {}, del: false };
+      return { ...p, [key]: { ...existing, del: !existing.del } };
     });
-  }
+  };
 
   function buildCorrections(): TransactionCorrection[] {
     const out: TransactionCorrection[] = [];
-    for (const s of suspects) {
-      const key = suspectKey(s);
-      const edit = edits[key];
-      if (edit === undefined) continue;
-      if (edit.shouldDelete) {
-        out.push({
-          chunk_id: s.chunk_id,
-          row_index: s.row_index,
-          action: "delete",
-          fields: {},
-        });
+    for (const s of list) {
+      const key = `${s.chunk_id}:${s.row_index}`;
+      const e = edits[key];
+      if (!e) continue;
+      if (e.del) {
+        out.push({ chunk_id: s.chunk_id, row_index: s.row_index, action: "delete", fields: {} });
         continue;
       }
-      if (Object.keys(edit.fields).length > 0) {
+      if (Object.keys(e.fields).length > 0) {
         out.push({
           chunk_id: s.chunk_id,
           row_index: s.row_index,
           action: "edit",
-          fields: edit.fields,
+          fields: e.fields,
         });
       }
     }
     return out;
   }
 
-  async function handleSubmit(force: boolean): Promise<void> {
-    setSubmitting(true);
-    try {
-      const result = await submitReview(pending.extraction_id, {
-        corrections: force ? [] : buildCorrections(),
-        force,
-      });
-      onResolved(result);
-    } catch (err: unknown) {
-      const msg = err instanceof ApiError ? err.message : String(err);
-      onError(msg);
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
   return (
-    <div
-      // biome-ignore lint/a11y/useSemanticElements: native <dialog> needs a showModal polyfill on older Safari; div + role=dialog + aria-modal is the documented fallback
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="review-modal-title"
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,0.55)",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "flex-start",
-        padding: 24,
-        zIndex: 1000,
-        overflowY: "auto",
-      }}
-    >
-      <div
-        style={{
-          background: "#fff",
-          borderRadius: 8,
-          width: "100%",
-          maxWidth: 760,
-          padding: 24,
-          fontFamily:
-            "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-        }}
-      >
-        <h2 id="review-modal-title" style={{ marginTop: 0, fontSize: "1.25rem", fontWeight: 700 }}>
-          Human review required
-        </h2>
-        <p style={{ marginTop: 0, color: "#495057" }}>{REASON_LABEL[pending.reason]}</p>
-        <p style={{ fontSize: "0.8125rem", color: "#6c757d" }}>
-          extraction_id: <code>{pending.extraction_id}</code>
-          <br />
-          {pending.suspect_count} suspect{pending.suspect_count !== 1 ? "s" : ""} flagged.
-        </p>
+    // biome-ignore lint/a11y/useKeyWithClickEvents: scrim click is a UX shortcut; the Close button below is the keyboard-accessible path
+    <div className="modal-scrim" onClick={onClose}>
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: stops event bubbling; inner content is keyboard accessible via its own controls */}
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div
+              style={{
+                width: 32,
+                height: 32,
+                borderRadius: 999,
+                background: "var(--warning-bg)",
+                border: "1px solid var(--warning-border)",
+                color: "var(--warning-fg)",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+              }}
+            >
+              <IconAlert size={16} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <h2 className="t-h4" style={{ margin: 0 }}>
+                Human review required
+              </h2>
+              <div className="t-caption" style={{ marginTop: 2 }}>
+                {REASON_LABEL[pauseReason]} {period.chunk_id}
+              </div>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onClose}
+              leftIcon={<IconXCircle size={13} />}
+            >
+              Close
+            </Button>
+          </div>
+          <div
+            className="mono"
+            style={{
+              fontSize: 11,
+              color: "var(--ink-3)",
+              marginTop: 12,
+              display: "flex",
+              gap: 14,
+              flexWrap: "wrap",
+            }}
+          >
+            <span>{list.length} suspects flagged</span>
+            <span>·</span>
+            <span>delta: {fmt$(period.reconciliation.delta)}</span>
+          </div>
+        </div>
 
-        {loading ? (
-          <p>Loading suspects…</p>
-        ) : suspects.length === 0 ? (
-          <p style={{ color: "#6c757d" }}>No suspect details returned.</p>
-        ) : (
-          <ul style={{ listStyle: "none", padding: 0, margin: "16px 0" }}>
-            {suspects.map((s) => {
-              const key = suspectKey(s);
-              const edit = edits[key];
+        <div className="modal-body">
+          <ul
+            style={{
+              listStyle: "none",
+              padding: 0,
+              margin: 0,
+              display: "flex",
+              flexDirection: "column",
+              gap: 12,
+            }}
+          >
+            {list.map((s) => {
+              const key = `${s.chunk_id}:${s.row_index}`;
+              const e = edits[key];
               return (
                 <li
                   key={key}
                   style={{
-                    border: "1px solid #dee2e6",
-                    borderRadius: 4,
-                    padding: 12,
-                    marginBottom: 12,
-                    background: edit?.shouldDelete ? "#fff3f3" : "#fff",
+                    border: `1px solid ${e?.del ? "var(--danger-border)" : "var(--border-1)"}`,
+                    background: e?.del ? "var(--danger-bg)" : "#fff",
+                    borderRadius: "var(--radius-3)",
+                    padding: 14,
                   }}
                 >
-                  <div style={{ marginBottom: 8 }}>
-                    <strong>{s.code}</strong> · {s.chunk_id} · row {s.row_index}
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                    <Chip kind="warning" label={s.code.replace(/_/g, " ")} />
+                    <span className="mono" style={{ fontSize: 11, color: "var(--ink-3)" }}>
+                      {s.chunk_id} · row {s.row_index}
+                    </span>
                   </div>
-                  <div style={{ fontSize: "0.875rem", color: "#495057", marginBottom: 8 }}>
+                  <div className="t-small" style={{ color: "var(--ink-2)", marginBottom: 10 }}>
                     {s.reason}
                   </div>
-                  {s.expected !== null && s.actual !== null && (
-                    <div style={{ fontSize: "0.8125rem", color: "#6c757d", marginBottom: 8 }}>
-                      expected <code>{s.expected}</code>, actual <code>{s.actual}</code>
+                  {s.expected && s.actual && (
+                    <div
+                      className="mono"
+                      style={{ fontSize: 11, color: "var(--ink-3)", marginBottom: 12 }}
+                    >
+                      expected <span style={{ color: "var(--success-fg)" }}>{s.expected}</span>
+                      {" · "}
+                      actual <span style={{ color: "var(--danger-fg)" }}>{s.actual}</span>
                     </div>
                   )}
 
-                  <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: 8 }}>
-                    {(
-                      ["date", "description", "amount", "direction", "running_balance"] as const
-                    ).map((field) => (
-                      <label key={field} style={{ display: "contents", fontSize: "0.8125rem" }}>
-                        <span style={{ alignSelf: "center" }}>{field}</span>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "auto 1fr auto 1fr",
+                      gap: 8,
+                      alignItems: "center",
+                    }}
+                  >
+                    {(["date", "description", "amount", "direction"] as const).map((field) => (
+                      <Fragment key={field}>
+                        {/* biome-ignore lint/a11y/noLabelWithoutControl: label is visually associated via grid layout with the sibling input — screen-reader navigation traverses both linearly */}
+                        <label
+                          className="t-label-muted"
+                          style={{ alignSelf: "center", color: "var(--ink-3)" }}
+                        >
+                          {field}
+                        </label>
                         <input
-                          type="text"
-                          value={edit?.fields?.[field] ?? ""}
-                          onChange={(e) => {
-                            updateField(s, field, e.target.value);
-                          }}
-                          placeholder={s.actual ?? ""}
-                          disabled={edit?.shouldDelete ?? false}
+                          className="mono"
+                          value={e?.fields?.[field] ?? ""}
+                          onChange={(ev) => setField(key, field, ev.target.value)}
+                          placeholder={
+                            field === "amount"
+                              ? (s.actual ?? "")
+                              : field === "date"
+                                ? "YYYY-MM-DD"
+                                : ""
+                          }
+                          disabled={e?.del}
                           style={{
-                            padding: "4px 8px",
-                            border: "1px solid #ced4da",
-                            borderRadius: 3,
-                            fontFamily: "ui-monospace, monospace",
+                            font: "inherit",
+                            fontSize: 12,
+                            padding: "5px 8px",
+                            border: "1px solid var(--border-2)",
+                            borderRadius: 4,
+                            background: e?.del ? "var(--surface-2)" : "#fff",
                           }}
                         />
-                      </label>
+                      </Fragment>
                     ))}
                   </div>
-
                   <label
                     style={{
                       display: "inline-flex",
                       alignItems: "center",
                       gap: 6,
-                      marginTop: 8,
-                      fontSize: "0.8125rem",
-                      color: "#dc3545",
+                      marginTop: 10,
+                      fontSize: 12,
+                      color: "var(--danger-fg)",
+                      cursor: "pointer",
                     }}
                   >
-                    <input
-                      type="checkbox"
-                      checked={edit?.shouldDelete ?? false}
-                      onChange={() => {
-                        toggleDelete(s);
-                      }}
-                    />
+                    <input type="checkbox" checked={!!e?.del} onChange={() => toggleDel(key)} />
                     Delete this row instead
                   </label>
                 </li>
               );
             })}
           </ul>
-        )}
+        </div>
 
-        <div style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}>
-          <button
-            type="button"
-            onClick={() => handleSubmit(true)}
-            disabled={submitting}
-            style={{
-              padding: "8px 16px",
-              border: "1px solid #6c757d",
-              background: "#fff",
-              color: "#6c757d",
-              borderRadius: 4,
-              cursor: submitting ? "not-allowed" : "pointer",
-            }}
+        <div className="modal-foot">
+          <Button variant="ghost" onClick={onClose} disabled={busy}>
+            Cancel
+          </Button>
+          <Button
+            variant="secondary"
+            disabled={busy}
+            onClick={() => onSubmit([], true)}
+            leftIcon={<IconCheck size={13} />}
           >
             Force finalize
-          </button>
-          <button
-            type="button"
-            onClick={() => handleSubmit(false)}
-            disabled={submitting || loading}
-            style={{
-              padding: "8px 16px",
-              border: "1px solid #0d6efd",
-              background: "#0d6efd",
-              color: "#fff",
-              borderRadius: 4,
-              cursor: submitting ? "not-allowed" : "pointer",
-            }}
+          </Button>
+          <Button
+            variant="primary"
+            disabled={busy}
+            onClick={() => onSubmit(buildCorrections(), false)}
+            leftIcon={<IconRefresh size={13} />}
           >
-            {submitting ? "Submitting…" : "Apply & re-extract"}
-          </button>
+            {busy ? "Submitting…" : "Apply & re-extract"}
+          </Button>
         </div>
       </div>
     </div>

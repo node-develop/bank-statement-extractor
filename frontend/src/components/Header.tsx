@@ -4,8 +4,8 @@ import { Button } from "./ui/Button";
 interface Props {
   /** Filename to show in the meta row (null = hide) */
   subtitle?: string | null;
-  /** Cumulative LLM cost (USD). Null/undefined hides the ticker. */
-  cost?: number | null;
+  /** Cumulative LLM cost (USD) — decimal string with 4dp. Null/undefined hides the ticker. */
+  cost?: string | null;
   /** Show the "New extract" reset button */
   showReset?: boolean;
   onReset?: () => void;
@@ -34,7 +34,7 @@ export function Header({ subtitle, cost, showReset, onReset }: Props) {
         )}
         {cost !== undefined && cost !== null && (
           <div className="cost-ticker" title="Cumulative LLM cost (cap $5.00)">
-            <IconZap size={11} style={{ color: "var(--ink-3)" }} />${cost.toFixed(4)}
+            <IconZap size={11} style={{ color: "var(--ink-3)" }} />${cost}
           </div>
         )}
         {showReset && (

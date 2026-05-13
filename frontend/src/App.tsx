@@ -1,150 +1,130 @@
-import { useState } from "react";
-import { PeriodCard } from "./components/PeriodCard";
+import { useCallback, useState } from "react";
+import { ApiError, extractStatement, submitReview } from "./api";
+import { Header } from "./components/Header";
+import { ProcessingView } from "./components/ProcessingView";
+import { ResultsView } from "./components/ResultsView";
 import { ReviewModal } from "./components/ReviewModal";
-import { UploadForm } from "./components/UploadForm";
-import type { ExtractResult } from "./types";
+import { UploadView } from "./components/UploadView";
+import { AGENT_STEPS } from "./lib/agentSteps";
+import type { ExtractResult, PeriodResult } from "./types";
+import type { ExtractionProgress, ProgressCallback } from "./types-progress";
+
+type Phase = "upload" | "processing" | "results";
+
+/** Initial progress shape, before any SSE event has arrived. */
+function emptyProgress(): ExtractionProgress {
+  return {
+    thread_id: "",
+    active_step: AGENT_STEPS[0].id,
+    cumulative_cost_usd: "0.0000",
+    steps: AGENT_STEPS.map((s) => ({ step_id: s.id, state: "idle", progress: 0, elapsed_ms: 0 })),
+    period_states: {},
+  };
+}
 
 export default function App() {
+  const [phase, setPhase] = useState<Phase>("upload");
+  const [progress, setProgress] = useState<ExtractionProgress>(emptyProgress());
   const [result, setResult] = useState<ExtractResult | null>(null);
-  const [reviewError, setReviewError] = useState<string | null>(null);
+  const [filename, setFilename] = useState<string | null>(null);
+  const [reviewing, setReviewing] = useState<PeriodResult | null>(null);
+  const [submitBusy, setSubmitBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const hasUnreconciled = result?.periods.some((p) => !p.reconciliation.reconciled);
-  const pendingReview = result?.pending_review ?? null;
+  const onProgress: ProgressCallback = useCallback((p) => setProgress(p), []);
+  // Reserved for Phase 6 streaming wiring (extractStatementStreaming).
+  void onProgress;
+
+  async function handleSubmit(pdf: File, ocr: File | null) {
+    setError(null);
+    setFilename(pdf.name);
+    setProgress(emptyProgress());
+    setPhase("processing");
+    try {
+      const r = await extractStatement(pdf, ocr ?? undefined);
+      setResult(r);
+      setPhase("results");
+    } catch (e) {
+      const msg = e instanceof ApiError ? e.message : "Network error — is the API running?";
+      setError(msg);
+      setPhase("upload");
+    }
+  }
+
+  async function handleReviewSubmit(
+    corrections: Parameters<typeof submitReview>[1]["corrections"],
+    force: boolean,
+  ) {
+    if (!result?.pending_review) return;
+    setSubmitBusy(true);
+    try {
+      const r = await submitReview(result.pending_review.extraction_id, { corrections, force });
+      setResult(r);
+      setReviewing(null);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : String(e));
+    } finally {
+      setSubmitBusy(false);
+    }
+  }
 
   return (
-    <div
-      style={{
-        maxWidth: 960,
-        margin: "0 auto",
-        padding: "24px 16px",
-        fontFamily:
-          "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-        lineHeight: 1.5,
-        color: "#212529",
-      }}
-    >
-      <h1 style={{ fontSize: "1.5rem", fontWeight: 700, marginBottom: 20 }}>
-        Bank Statement Analyzer
-      </h1>
-
-      <UploadForm onResult={setResult} />
-
-      {pendingReview !== null && (
-        <ReviewModal
-          pending={pendingReview}
-          onResolved={(r) => {
-            setResult(r);
-            setReviewError(null);
-          }}
-          onError={setReviewError}
-        />
-      )}
-
-      {reviewError !== null && (
-        <div
-          role="alert"
-          style={{
-            background: "#f8d7da",
-            border: "1px solid #dc3545",
-            borderRadius: 4,
-            padding: "10px 14px",
-            marginBottom: 16,
-            color: "#721c24",
-          }}
-        >
-          Review submission failed: {reviewError}
-        </div>
-      )}
-
-      {result !== null && (
-        <>
-          {hasUnreconciled && (
-            <div
-              role="alert"
-              style={{
-                background: "#f8d7da",
-                border: "2px solid #dc3545",
-                borderRadius: 4,
-                padding: "12px 16px",
-                marginBottom: 20,
-                color: "#721c24",
-                fontWeight: 700,
-                fontSize: "1rem",
-              }}
-            >
-              One or more periods did not reconcile. See the red banners below.
-            </div>
-          )}
-
-          {result.errors.length > 0 && (
-            <div
-              role="alert"
-              style={{
-                background: "#fff3cd",
-                border: "1px solid #ffc107",
-                borderRadius: 4,
-                padding: "10px 14px",
-                marginBottom: 20,
-                color: "#856404",
-              }}
-            >
-              <strong>Pipeline warnings ({result.errors.length}):</strong>
-              <ul style={{ margin: "6px 0 0 0", paddingLeft: 20 }}>
-                {result.errors.map((e, i) => (
-                  // biome-ignore lint/suspicious/noArrayIndexKey: errors have no stable key
-                  <li key={i}>{e}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          <div style={{ marginBottom: 12, fontSize: "0.8125rem", color: "#6c757d" }}>
-            SHA-256: {result.statement_sha256}
-            {result.langsmith_run_url !== null && (
-              <>
-                {" · "}
-                <a
-                  href={result.langsmith_run_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ color: "#0d6efd" }}
-                >
-                  LangSmith trace
-                </a>
-              </>
-            )}
+    <div className="bse-root app-shell">
+      <Header
+        subtitle={phase !== "upload" ? filename : null}
+        cost={phase !== "upload" ? progress.cumulative_cost_usd : null}
+        showReset={phase !== "upload"}
+        onReset={() => {
+          setPhase("upload");
+          setResult(null);
+          setReviewing(null);
+          setError(null);
+        }}
+      />
+      <main className="app-main">
+        {phase === "upload" && <UploadView onSubmit={handleSubmit} />}
+        {phase === "processing" && (
+          <ProcessingView
+            progress={progress}
+            periods={[] /* fill in once split_periods event arrives */}
+            onCancel={() => setPhase("upload")}
+          />
+        )}
+        {phase === "results" && result && (
+          <ResultsView
+            result={result}
+            filename={filename ?? undefined}
+            wallClockText={undefined}
+            costUsd={progress.cumulative_cost_usd || undefined}
+            onReview={setReviewing}
+          />
+        )}
+        {error && (
+          <div
+            role="alert"
+            style={{
+              maxWidth: 720,
+              margin: "16px auto",
+              background: "var(--danger-bg)",
+              border: "1px solid var(--danger-border)",
+              borderRadius: "var(--radius-3)",
+              padding: "10px 14px",
+              color: "var(--danger-fg)",
+            }}
+          >
+            {error}
           </div>
+        )}
+      </main>
 
-          <p style={{ marginBottom: 16, fontSize: "0.875rem", color: "#495057" }}>
-            {result.periods.length} period{result.periods.length !== 1 ? "s" : ""} extracted.
-          </p>
-
-          {result.periods.map((period) => (
-            <PeriodCard key={period.chunk_id} period={period} />
-          ))}
-
-          <details style={{ marginTop: 32 }}>
-            <summary
-              style={{ cursor: "pointer", fontWeight: 600, userSelect: "none", marginBottom: 8 }}
-            >
-              Raw JSON response
-            </summary>
-            <pre
-              style={{
-                background: "#f8f9fa",
-                border: "1px solid #dee2e6",
-                borderRadius: 4,
-                padding: 16,
-                overflowX: "auto",
-                fontSize: "0.8125rem",
-                maxHeight: 600,
-                overflowY: "auto",
-              }}
-            >
-              {JSON.stringify(result, null, 2)}
-            </pre>
-          </details>
-        </>
+      {reviewing && (
+        <ReviewModal
+          period={reviewing}
+          pauseReason={result?.pending_review?.reason ?? "suspects_exceeded"}
+          busy={submitBusy}
+          onClose={() => setReviewing(null)}
+          onSubmit={handleReviewSubmit}
+        />
       )}
     </div>
   );
