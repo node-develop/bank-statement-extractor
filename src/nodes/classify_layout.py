@@ -113,7 +113,7 @@ def _invoke_llm(chunk: PeriodChunk, text: str) -> dict[str, Any]:
     in a second content block WITHOUT cache_control, so it doesn't poison the
     cache key.
     """
-    from langchain_core.messages import SystemMessage
+    from langchain_core.messages import HumanMessage, SystemMessage
 
     prompt_body = load_prompt("classify_layout", version=1)
     stable_prefix, sep, _ = prompt_body.partition("{chunk_text}")
@@ -122,6 +122,9 @@ def _invoke_llm(chunk: PeriodChunk, text: str) -> dict[str, Any]:
         # uncached block so behavior is correct even if caching is sub-optimal.
         stable_prefix = prompt_body
 
+    # Stable prefix → SystemMessage (cached via cache_control: ephemeral).
+    # Dynamic chunk text → HumanMessage (Anthropic requires ≥1 user message;
+    # docs.langchain.com/oss/python/langgraph/use-graph-api).
     system = SystemMessage(
         content=[
             {
@@ -129,15 +132,12 @@ def _invoke_llm(chunk: PeriodChunk, text: str) -> dict[str, Any]:
                 "text": stable_prefix,
                 "cache_control": {"type": "ephemeral"},
             },
-            {
-                "type": "text",
-                "text": text,
-            },
         ]
     )
+    user = HumanMessage(content=text)
 
     llm_with_output = _get_llm().with_structured_output(LayoutLabel)
-    raw_result: LayoutLabel = llm_with_output.invoke([system])
+    raw_result: LayoutLabel = llm_with_output.invoke([system, user])
 
     # Always overwrite chunk_id from the input chunk — the LLM output's
     # chunk_id is unreliable because the model may echo the exemplar id.

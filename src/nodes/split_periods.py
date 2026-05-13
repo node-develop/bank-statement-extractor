@@ -35,6 +35,12 @@ _ACCT_SINGLE = re.compile(r"^Account Number:\s*(?:XXXXXX)?(\d{4})\s*$")
 _ACCT_LABEL = re.compile(r"^Account Number:\s*$")
 _ACCT_DIGITS = re.compile(r"^(?:XXXXXX)?(\d{4})\s*$")
 
+# Generic mid-line form for non-Ixonia layouts (Chase/BofA/Wells Fargo/PNC):
+#   "HOUSTON TX 77032-1184 Account Number: ****8421"
+#   "Account Number: xxxx-1234"
+# Anywhere in the line, with any masking prefix before the final 4 digits.
+_ACCT_ANYWHERE = re.compile(r"Account\s*(?:Number|Num|#)\s*[:\.]?\s*[\*xX\-\s]*(\d{4})\b")
+
 _LOOKBACK = 20  # max lines before Beginning anchor to scan for account number
 
 
@@ -81,7 +87,31 @@ def split_periods(state: GraphState) -> dict[str, Any]:
         )
 
     n_chunks = min(len(beg_matches), len(end_matches))
-    chunks: list[PeriodChunk] = []
+
+    # ------------------------------------------------------------------
+    # Fallback for non-Ixonia layouts (Chase / BofA / Wells / PNC / etc.):
+    # when no "Beginning Balance as of MM/DD/YYYY" anchor matches, emit a
+    # SINGLE chunk covering the whole document.  The extractor prompts
+    # already handle multi-bank summaries via few-shot exemplars; their
+    # only requirement is that they receive the period text.
+    # ------------------------------------------------------------------
+    if n_chunks == 0:
+        logger.info("split_periods: no Ixonia anchors found; emitting 1 whole-doc chunk")
+        whole_doc_hint = _find_account_anywhere(lines)
+        pdf_text_all = "\n".join(raw.pages) if raw.pages else ""
+        first_page, last_page = (1, max(len(raw.pages), 1))
+        chunks: list[PeriodChunk] = [
+            PeriodChunk(
+                chunk_id="period_01",
+                page_range=(first_page, last_page),
+                pdf_text=pdf_text_all,
+                ocr_slice=ocr_text,
+                account_hint_last4=whole_doc_hint,
+            )
+        ]
+        return {"period_chunks": chunks, "errors": errors}
+
+    chunks = []
 
     for k in range(n_chunks):
         beg_idx, beg_m = beg_matches[k]
@@ -163,6 +193,19 @@ def _find_account_hint(
         f"split_periods: account_last4 not found within {_LOOKBACK} lines "
         f"before line {beg_idx + 1} (period {mm}/{yyyy})"
     )
+    return None
+
+
+def _find_account_anywhere(lines: list[str]) -> str | None:
+    """Scan the whole document for ``Account Number: ****1234``-style hints.
+
+    Used by the fallback whole-doc chunk path.  Returns the FIRST 4-digit
+    match — non-Ixonia statements typically only carry one account.
+    """
+    for line in lines:
+        m = _ACCT_ANYWHERE.search(line)
+        if m:
+            return m.group(1)
     return None
 
 

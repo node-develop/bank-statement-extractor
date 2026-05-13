@@ -29,7 +29,7 @@ from pydantic import (
 
 if TYPE_CHECKING:
     import datetime
-from datetime import date  # noqa: TC003  # runtime-required by Pydantic v2 field annotations
+from datetime import date  # runtime-required by Pydantic v2 field annotations
 
 __all__ = [
     "EPSILON",
@@ -84,6 +84,20 @@ class Period(BaseModel):
 
     start: date
     end: date
+
+    @field_validator("start", "end", mode="before")
+    @classmethod
+    def _coerce_iso_date(cls, v: object) -> object:
+        """Accept ISO-8601 strings from LLM structured output.
+
+        ``model_config=strict=True`` would otherwise reject any string
+        when the field is typed ``date``.  LLMs return dates as strings
+        in their JSON output; LangChain ``with_structured_output``
+        delivers them as-is via ``model_validate`` in Python (strict) mode.
+        """
+        if isinstance(v, str):
+            return date.fromisoformat(v)
+        return v
 
     @field_validator("end")
     @classmethod
@@ -166,6 +180,14 @@ class Transaction(BaseModel):
     amount: Decimal  # non-negative; sign conveyed by ``direction``
     direction: Literal["credit", "debit"]
     running_balance: Decimal | None = None
+
+    @field_validator("date", mode="before")
+    @classmethod
+    def _coerce_iso_date(cls, v: object) -> object:
+        """Accept ISO-8601 strings from LLM structured output (strict=True)."""
+        if isinstance(v, str):
+            return date.fromisoformat(v)
+        return v
 
     @field_validator("amount", mode="before")
     @classmethod
