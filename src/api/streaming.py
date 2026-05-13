@@ -198,6 +198,11 @@ async def stream_graph_events(
                             "progress": 1.0,
                             "elapsed_ms": _ts_ms() - step_started_at.get(node, _ts_ms()),
                         }
+                        # Reset gate so a subsequent critic-retry of the same
+                        # node emits a fresh running event (the timeline lane
+                        # otherwise stays "done" through the retry pass).
+                        step_emitted_running.discard(node)
+                        step_started_at.pop(node, None)
                         if node == "reconcile":
                             for pr in _period_states_from_reconcile(ev):
                                 yield pr

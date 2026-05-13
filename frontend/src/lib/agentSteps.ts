@@ -124,11 +124,8 @@ export function fmt$(s: string | null | undefined): string {
   }
 }
 
-/** Shortform for hero stats — "$1,234" (no cents). */
-export function fmt$short(s: string | number): string {
-  if (typeof s === "number") {
-    return `$${Math.round(s).toLocaleString("en-US")}`;
-  }
+/** Shortform for hero stats — "$1,234" (no cents). Decimal string input only (precision contract). */
+export function fmt$short(s: string): string {
   try {
     const cents = centsFromDecimalString(s);
     const dollars = cents / 100n;

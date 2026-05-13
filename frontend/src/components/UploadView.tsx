@@ -80,7 +80,7 @@ export function UploadView({ onSubmit, busy }: Props) {
           {pdf ? pdf.name : "Drop a bank-statement PDF here"}
         </div>
         <div style={{ fontSize: "var(--text-sm)", color: "var(--ink-3)", marginBottom: 4 }}>
-          or click to browse from disk. Up to 25 MB.
+          or click to browse from disk. Up to 80 MB.
         </div>
         <div className="mono" style={{ fontSize: 11, color: "var(--ink-4)", marginTop: 10 }}>
           Optional .txt OCR companion{ocr ? ` — selected: ${ocr.name}` : ""}
