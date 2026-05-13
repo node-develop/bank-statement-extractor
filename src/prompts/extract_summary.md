@@ -16,9 +16,13 @@ chunk_id           : string   — pass through unchanged from the input header
 beginning_balance  : Decimal  — opening balance (may be negative)
 ending_balance     : Decimal  — closing balance (may be negative)
 deposits_total     : Decimal  — total credits this period
-deposits_count     : int >= 0 — from parentheses in "Deposits and Credits (N)"
+deposits_count     : int >= 0 — from parentheses in "Deposits and Credits (N)";
+                                 RETURN 0 if the statement does not print an
+                                 explicit count (Chase / BofA / Wells Fargo /
+                                 PNC layouts typically print totals only).
 withdrawals_total  : Decimal  — total debits this period
-withdrawals_count  : int >= 0 — from parentheses in "Withdrawals and Debits (N)"
+withdrawals_count  : int >= 0 — from parentheses in "Withdrawals and Debits (N)";
+                                 RETURN 0 if not printed (same rule as above).
 ```
 
 ## Source-of-truth block
@@ -34,7 +38,9 @@ Ending Balance as of MM/DD/YYYY          $N,NNN.NN
 
 The count `N` inside the parentheses is `deposits_count` / `withdrawals_count`. Do NOT count individual transaction rows — read the number from the parentheses.
 
-Service Charges lines may appear in the balance block; they are already included in `withdrawals_count` and `withdrawals_total`. Do not add them separately.
+**When the count is NOT printed** (most non-Ixonia layouts — Chase, BofA, Wells Fargo, PNC, etc. only print totals like `Deposits and other credits $110,850.55` without an `(N)` count), **return 0** for that count field. The reconciler treats 0 as "unknown" and skips the count invariant; counting transactions yourself would be a guess and contradict the verbatim-grounding rule.
+
+Service Charges lines may appear in the balance block; they are already included in `withdrawals_count` and `withdrawals_total` when those are printed. Do not add them separately.
 
 ## Currency parsing rule
 
@@ -64,6 +70,35 @@ Output:
   "withdrawals_count": 111
 }
 ```
+
+## Few-shot exemplar — Chase Apr 2026 (counts NOT printed)
+
+Input:
+```
+chunk_id: period_01
+
+Account Summary
+
+Beginning balance on April 01, 2026 $48,762.34
+Deposits and other credits $110,850.55
+Withdrawals and other debits -$86,438.17
+Ending balance on April 30, 2026 $73,174.72
+```
+
+Output:
+```json
+{
+  "chunk_id": "period_01",
+  "beginning_balance": "48762.34",
+  "ending_balance": "73174.72",
+  "deposits_total": "110850.55",
+  "deposits_count": 0,
+  "withdrawals_total": "86438.17",
+  "withdrawals_count": 0
+}
+```
+
+Note: counts are 0 because the Chase layout does NOT print "(N)" counters.
 
 ## Chunk to extract
 

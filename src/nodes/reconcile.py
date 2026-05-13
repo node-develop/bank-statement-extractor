@@ -138,14 +138,21 @@ def _reconcile_chunk(
     notes: list[str] = []
 
     # Check counts first — most common silent failure mode (spec requirement).
+    #
+    # Sentinel ``summary.deposits_count == 0`` (or withdrawals_count == 0) means
+    # the source statement DOESN'T PRINT explicit counts (Chase / BofA /
+    # generic US-bank layouts only print totals, not "(N)" counters like
+    # Ixonia's "Deposits and Credits (81)").  In that case the extractor
+    # emits 0 as "unknown"; we skip the count invariant rather than flag a
+    # spurious mismatch when balance arithmetic actually reconciles.
     # Invariant B
-    if actual_credits_count != summary.deposits_count:
+    if summary.deposits_count > 0 and actual_credits_count != summary.deposits_count:
         notes.append(
             f"deposits_count: actual={actual_credits_count} vs summary={summary.deposits_count}"
         )
 
     # Invariant C
-    if actual_debits_count != summary.withdrawals_count:
+    if summary.withdrawals_count > 0 and actual_debits_count != summary.withdrawals_count:
         notes.append(
             f"withdrawals_count: actual={actual_debits_count} "
             f"vs summary={summary.withdrawals_count}"
