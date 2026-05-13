@@ -219,32 +219,27 @@ def build_graph(checkpointer: object | None = None) -> Any:
     )
 
     # ------------------------------------------------------------------
-    # HITL path (Phase 4): await_review → {apply_human_corrections | finalize}
-    # ``route_after_review`` reads ``force_resume`` and the corrections list
-    # to decide whether to re-extract or accept the partial result.
+    # HITL path (Phase 4): await_review →
+    #   - force_resume=True OR no corrections → "finalize"
+    #   - corrections present → list[Send] dispatching extract_transactions
+    # Mirrors the ``critic → apply_critic_hint`` pattern: the helper is used
+    # ONLY as the routing function (not registered as a node), so its
+    # ``list[Send]`` return value is consumed by ``add_conditional_edges``
+    # rather than being treated as a state delta dict (which would be a
+    # silent re-execution bug).
     # ------------------------------------------------------------------
-    def _route_after_review(state: GraphState) -> str:
+    def _route_after_review(state: GraphState) -> str | list[Send]:
         if state.get("force_resume"):
             return "finalize"
-        if state.get("human_corrections"):
-            return "apply_human_corrections"
-        return "finalize"
+        sends = apply_human_corrections(state)
+        if not sends:
+            return "finalize"
+        return sends
 
-    graph.add_node("apply_human_corrections", apply_human_corrections)
     graph.add_conditional_edges(
         "await_review",
         _route_after_review,
-        {
-            "apply_human_corrections": "apply_human_corrections",
-            "finalize": "finalize",
-        },
-    )
-    # apply_human_corrections returns list[Send] targeting extract_transactions;
-    # those sends loop back through merge_state → verifier as before.
-    graph.add_conditional_edges(
-        "apply_human_corrections",
-        apply_human_corrections,
-        ["extract_transactions"],
+        ["finalize", "extract_transactions"],
     )
 
     # ------------------------------------------------------------------

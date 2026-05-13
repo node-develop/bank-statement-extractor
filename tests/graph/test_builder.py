@@ -29,7 +29,6 @@ _EXPECTED_NODES = {
     "critic",
     "apply_critic_hint",
     "await_review",
-    "apply_human_corrections",
     "finalize",
     "__start__",
 }

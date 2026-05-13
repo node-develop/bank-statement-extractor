@@ -271,3 +271,32 @@ def test_post_review_404_for_unknown_id(client_with_paused_graph: Any) -> None:
         json={"corrections": [], "force": True},
     )
     assert resp.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# Test 6: 409 on POST when status is already 'resolved' (PRD §5.2)
+# ---------------------------------------------------------------------------
+
+
+def test_post_review_409_when_already_resolved(
+    client_with_paused_graph: Any,
+) -> None:
+    client, _ = client_with_paused_graph
+    body = client.post(
+        "/extract",
+        files={"file": ("s.pdf", io.BytesIO(_STUB_PDF), "application/pdf")},
+    ).json()
+    extraction_id = body["pending_review"]["extraction_id"]
+
+    # Manually flip status to 'resolved' to simulate the post-resume state.
+    from src.api import reviews as reviews_db
+
+    reviews_db.mark_resolved(extraction_id)
+
+    resp = client.post(
+        f"/review/{extraction_id}",
+        json={"corrections": [], "force": True},
+    )
+    assert resp.status_code == 409
+    detail = resp.json().get("detail", "")
+    assert "resolved" in str(detail), f"expected status mention in detail, got: {detail}"
