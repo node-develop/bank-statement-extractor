@@ -189,14 +189,7 @@ def split_periods(state: GraphState) -> dict[str, Any]:
 
         first_page, last_page = page_ranges[k]
         if raw.pages:
-            # Inject explicit "--- page N ---" markers between joined pages so
-            # Sonnet 4.6 can self-verify it scanned every page and does not
-            # double-emit transactions that straddle a page break. Empirically
-            # required to stop the duplicate-row failure on period_04 of the
-            # Ixonia Binder2 sample (see eval runs on commit b596fde).
-            pdf_text = "\n".join(
-                f"--- page {p} ---\n{raw.pages[p - 1]}" for p in range(first_page, last_page + 1)
-            )
+            pdf_text = "\n".join(raw.pages[first_page - 1 : last_page])
         else:
             pdf_text = ""
 
