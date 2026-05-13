@@ -1,12 +1,13 @@
 /**
  * Progress-stream types for the live agent timeline.
  *
- * MERGE INTO `frontend/src/types.ts` — do not import from this file,
- * copy these interfaces into your existing types module.
- *
- * Backend contract (Phase 5 — see PRD-redesign.md §5):
- *   GET /extract/stream/{thread_id}  → text/event-stream
- *   events: data: {"step_id": "...", "state": "running", ...}
+ * Backend contract (see docs/superpowers/specs/2026-05-13-frontend-redesign-design.md §4):
+ *   POST /extract/stream  → text/event-stream
+ *   events: data: {"kind": "step", "step_id": "...", "state": "running", ...}
+ *           data: {"kind": "cost", "cumulative_cost_usd": "0.1834"}
+ *           data: {"kind": "period", "chunk_id": "period_03", "state": "danger"}
+ *           data: {"kind": "result", "result": <ExtractResult>}
+ *           data: {"kind": "done"}
  */
 
 export type AgentState = "idle" | "running" | "done" | "error";
