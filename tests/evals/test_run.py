@@ -1,4 +1,4 @@
-"""Tests for src/evals/run.py CLI (rule 9 — business intent)."""
+"""Tests for src/evals/run.py CLI — business intent."""
 
 from __future__ import annotations
 

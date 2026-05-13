@@ -1,4 +1,4 @@
-"""HITL review endpoints (PRD §5.2).
+"""HITL review endpoints.
 
 GET  /pending_review              — list rows in status='pending'
 GET  /review/{extraction_id}      — full payload + suspects + chunk excerpts
@@ -105,8 +105,8 @@ async def submit_review(
     # The graph either completes (final present) or pauses again (interrupt).
     if "final" not in result_state:
         # Re-pause: insert a NEW pending_reviews row with the new interrupt
-        # payload (PRD §5.3 — re-pause produces a new extraction_id) and mark
-        # the prior row resolved so it doesn't show up as a stale duplicate.
+        # payload — re-pause produces a new extraction_id — and mark the prior
+        # row resolved so it doesn't show up as a stale duplicate.
         # Surface the new id to the caller via a 409 response detail so the
         # frontend can re-fetch /review/{new_extraction_id}.
         from uuid import uuid4

@@ -1,8 +1,7 @@
 /**
  * Progress-stream types for the live agent timeline.
  *
- * Backend contract (see docs/superpowers/specs/2026-05-13-frontend-redesign-design.md §4):
- *   POST /extract/stream  → text/event-stream
+ * Backend contract for POST /extract/stream  → text/event-stream:
  *   events: data: {"kind": "step", "step_id": "...", "state": "running", ...}
  *           data: {"kind": "cost", "cumulative_cost_usd": "0.1834"}
  *           data: {"kind": "period", "chunk_id": "period_03", "state": "danger"}

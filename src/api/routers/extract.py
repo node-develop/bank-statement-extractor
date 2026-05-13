@@ -10,8 +10,8 @@ Contract
 - 422 when the graph raises ``RuntimeError("ingest: PDF unreadable …")``.
 - 500 for all other unhandled exceptions (FastAPI default handler).
 
-No business logic lives here (CLAUDE.md rule 4). The router translates
-HTTP → ``graph.ainvoke`` → HTTP and nothing else.
+No business logic lives here. The router translates HTTP → ``graph.ainvoke``
+→ HTTP and nothing else.
 """
 
 from __future__ import annotations
@@ -42,7 +42,7 @@ def _build_partial_periods_on_pause(
     state: dict[str, Any],
 ) -> list[PeriodResult]:
     """Assemble PeriodResult objects from state when the graph paused at
-    ``await_review`` (rule 12 — surface what we have, never silently empty).
+    ``await_review`` — surface what we have, never silently empty.
 
     Runs the pure-Python ``reconcile`` node on the partial state so each
     PeriodResult carries the real Reconciliation (reconciled=True with
@@ -126,7 +126,7 @@ async def extract(
 
     The temporary file(s) are deleted after the response is sent via a
     ``BackgroundTask`` so the graph can read them synchronously during
-    invocation (SKILL.md pattern).
+    invocation.
     """
     # ------------------------------------------------------------------
     # Content-type guard (415)
@@ -150,7 +150,7 @@ async def extract(
         )
 
     # ------------------------------------------------------------------
-    # SHA-256 for LangSmith metadata + idempotent cache key (CLAUDE.md rule 3)
+    # SHA-256 for LangSmith metadata + idempotent cache key
     # ------------------------------------------------------------------
     digest = sha256(pdf_bytes).hexdigest()
 
@@ -203,14 +203,13 @@ async def extract(
         "retry_count": 0,
         "errors": [],
         "notes": [],
-        # Phase 3 — cumulative LLM cost (operator.add reducer in GraphState).
+        # Cumulative LLM cost (operator.add reducer in GraphState).
         # Must be initialised here or the first node addition raises.
         "cumulative_cost_usd": Decimal("0"),
     }
-    # LangSmith metadata per CLAUDE.md "LangSmith" conventions.
-    # `bank_slug` and `statement_pages` are NOT known at the API boundary —
-    # they emerge after `classify_layout` and `ingest` run inside the graph.
-    # M3 will propagate them back into the run tags via a finalize hook.
+    # LangSmith metadata. `bank_slug` and `statement_pages` are NOT known at
+    # the API boundary — they emerge after `classify_layout` and `ingest` run
+    # inside the graph.
     config: dict[str, object] = {
         "configurable": {"thread_id": thread_id},
         "run_name": f"unknown:{digest[:8]}",
@@ -239,7 +238,7 @@ async def extract(
             )
         raise
 
-    # Phase 4 — detect await_review pause: when the graph hit interrupt(),
+    # Detect await_review pause: when the graph hit interrupt(),
     # 'final' is absent and '__interrupt__' carries the suspect payload.
     # Insert a pending_reviews row and return a partial ExtractResult with
     # pending_review set so the frontend can render the modal.

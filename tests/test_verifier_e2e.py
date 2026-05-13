@@ -1,9 +1,9 @@
-"""End-to-end Phase 3 tests for the verifier → routing topology.
+"""End-to-end tests for the verifier → routing topology.
 
-Per PRD §4.5 — three scenarios that exercise ``route_after_verifier`` directly
-without invoking the full graph (the topology smoke tests in
-``tests/graph/test_builder.py`` already cover the wiring; here we verify the
-routing decision logic for the three exit paths).
+Three scenarios exercise ``route_after_verifier`` directly without invoking
+the full graph (the topology smoke tests in ``tests/graph/test_builder.py``
+already cover the wiring; here we verify the routing decision logic for the
+three exit paths).
 """
 
 from __future__ import annotations
@@ -135,13 +135,13 @@ def test_verifier_routes_retry_exhausted_to_review() -> None:
 
 
 def test_verifier_routes_cost_cap_to_review(monkeypatch: pytest.MonkeyPatch) -> None:
-    """PRD §4.5: state starts at cumulative_cost_usd=4.99; one extra LLM call's
-    cost increment pushes the total over the $5.00 cap, and the next routing
+    """State starts at cumulative_cost_usd=4.99; one extra LLM call's cost
+    increment pushes the total over the $5.00 cap, and the next routing
     decision sends the graph to await_review.
 
-    This exercises the *accumulation* path (PRD §8.2): the per-call cost is
-    computed via call_cost(model, usage_metadata) and merged through the
-    _add_decimal reducer before route_after_verifier reads the field.
+    This exercises the *accumulation* path: the per-call cost is computed via
+    call_cost(model, usage_metadata) and merged through the _add_decimal
+    reducer before route_after_verifier reads the field.
     """
     monkeypatch.setenv("BSA_COST_CAP_USD", "5.00")
 

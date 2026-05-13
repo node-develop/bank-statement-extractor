@@ -1,6 +1,4 @@
-"""Tests for src/models/__init__.py — invariants and JSON round-trips (rule 9).
-
-Closes a known M0 gap (critic finding from M1 review):
+"""Tests for src/models/__init__.py — invariants and JSON round-trips.
 
 - Decimal fields survive JSON round-trip without precision loss.
 - Validators reject obviously-wrong input (negative amount, float for money,
@@ -33,7 +31,7 @@ from src.models import (
 
 
 def test_epsilon_is_one_cent() -> None:
-    """Reconciliation tolerance is exactly $0.01 (CLAUDE.md conventions)."""
+    """Reconciliation tolerance is exactly $0.01."""
     assert EPSILON == Decimal("0.01")
 
 

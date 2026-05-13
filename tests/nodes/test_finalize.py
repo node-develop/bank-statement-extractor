@@ -1,4 +1,4 @@
-"""Tests for src/nodes/finalize.py — business-intent assertions (rule 9).
+"""Tests for src/nodes/finalize.py — business-intent assertions.
 
 finalize assembles ExtractResult from all per-chunk lists. No LLM needed.
 """

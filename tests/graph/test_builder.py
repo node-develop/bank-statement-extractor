@@ -1,10 +1,9 @@
 """Topology smoke tests for src/graph/builder.py — no real LLM calls.
 
 These tests assert that the compiled graph has the expected node set and
-conditional edges WITHOUT invoking any node.  They validate the wiring
-contract (architecture.md) at import time.
+conditional edges WITHOUT invoking any node.
 
-Phase 3: topology now is
+Topology:
 ``merge_state → verifier → route_after_verifier → {reconcile|critic|await_review}``;
 ``critic → apply_critic_hint → [Send to extract_*] → merge_state``.
 """
@@ -14,7 +13,7 @@ from __future__ import annotations
 from src.graph.builder import build_graph
 
 # ---------------------------------------------------------------------------
-# Expected node names (architecture.md graph topology, Phase 3)
+# Expected node names
 # ---------------------------------------------------------------------------
 _EXPECTED_NODES = {
     "ingest",
@@ -83,21 +82,21 @@ class TestBuildGraphTopology:
         )
 
     def test_verifier_downstream_of_merge_state(self) -> None:
-        """Phase 3: merge_state → verifier (NOT directly to reconcile)."""
+        """merge_state → verifier (NOT directly to reconcile)."""
         graph = build_graph(checkpointer=None)
         edges = graph.get_graph().edges
         sources_to_targets = {(e.source, e.target) for e in edges}
         assert ("merge_state", "verifier") in sources_to_targets
 
     def test_reconcile_finalizes_directly(self) -> None:
-        """Phase 3: reconcile → finalize (no should_run_critic in between)."""
+        """reconcile → finalize (no should_run_critic in between)."""
         graph = build_graph(checkpointer=None)
         edges = graph.get_graph().edges
         sources_to_targets = {(e.source, e.target) for e in edges}
         assert ("reconcile", "finalize") in sources_to_targets
 
     def test_await_review_finalizes(self) -> None:
-        """Phase 3: await_review → finalize (post-resume)."""
+        """await_review → finalize (post-resume)."""
         graph = build_graph(checkpointer=None)
         edges = graph.get_graph().edges
         sources_to_targets = {(e.source, e.target) for e in edges}

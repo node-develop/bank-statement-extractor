@@ -1,19 +1,16 @@
 """SSE event generator over a single ``graph.astream_events`` invocation.
 
-Phase 4 of `docs/superpowers/specs/2026-05-13-frontend-redesign-design.md`.
-
 Pure async generator: no FastAPI, no HTTP. The router in
 `src/api/routers/extract_stream.py` wraps these dicts into
 ``data: {json}\\n\\n`` lines.
 
 Cost attribution is by **model name** (from each AIMessage's
-``response_metadata.model_name``), not by graph-node name — LangGraph
-1.x does not auto-inject a ``langgraph:node=<name>`` tag (see
-``docs/architecture.md`` §"SSE event mapping").
+``response_metadata.model_name``), not by graph-node name — LangGraph 1.x
+does not auto-inject a ``langgraph:node=<name>`` tag.
 
 Server-side fan-out aggregation collapses ``Send``-fanned branches of
-a step (e.g. 10 parallel ``extract_account`` invocations on Ixonia)
-into one ``state:"running"`` + one ``state:"done"`` event per lane.
+a step (e.g. 10 parallel ``extract_account`` invocations) into one
+``state:"running"`` + one ``state:"done"`` event per lane.
 """
 
 from __future__ import annotations
@@ -253,7 +250,7 @@ async def stream_graph_events(
                         "cumulative_cost_usd": str(cumulative_cost.quantize(Decimal("0.0001"))),
                     }
 
-            # Harvest any `errors` reducer deltas the node emitted (rule 12).
+            # Harvest any `errors` reducer deltas the node emitted.
             if kind == "on_chain_end":
                 out = (ev.get("data") or {}).get("output")
                 if isinstance(out, dict):

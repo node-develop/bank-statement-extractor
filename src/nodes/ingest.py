@@ -1,6 +1,6 @@
 """``ingest`` graph node — load a PDF and optional OCR text into ``GraphState``.
 
-Source-selection policy (architecture.md "ingest" node):
+Source-selection policy:
 
 - pdfplumber is the primary PDF text extractor.
 - On pdfplumber failure, fall back to pypdf.
@@ -10,11 +10,10 @@ Source-selection policy (architecture.md "ingest" node):
   AND no ``ocr_text`` companion was supplied, fall back to server-side
   Tesseract OCR via ``ocrmypdf``. Engages only when the average extracted
   text per page is below ``_OCR_AVG_CHARS_PER_PAGE`` — a noisy scan with a
-  few real characters does not trigger OCR (rule 7 — surface, don't average;
-  the engine is recorded in ``errors[]`` so the user can see what happened).
+  few real characters does not trigger OCR; the engine is recorded in
+  ``errors[]`` so the user can see what happened.
 - Pages where pdfplumber returns empty text are flagged in ``errors[]``
-  when ``ocr_text`` is available; page-aligned OCR substitution is deferred
-  to a later milestone.
+  when ``ocr_text`` is available; page-aligned OCR substitution is deferred.
 """
 
 from __future__ import annotations
@@ -89,10 +88,9 @@ def ingest(state: GraphState) -> dict[str, Any]:
 
     # OCR fallback: when the user did NOT supply a .txt companion and the
     # extracted text density is below threshold, the PDF is image-based.
-    # Engine selection: Azure Document Intelligence (preferred — matches
-    # Task/ixonia_binder2_ocr.txt baseline which reconciles 100% on Ixonia)
-    # when AZURE_DI_ENDPOINT + AZURE_DI_KEY env vars are set; otherwise
-    # fallback to ocrmypdf/Tesseract (self-hosted, no key required).
+    # Engine selection: Azure Document Intelligence (preferred) when
+    # AZURE_DI_ENDPOINT + AZURE_DI_KEY env vars are set; otherwise fallback
+    # to ocrmypdf/Tesseract (self-hosted, no key required).
     if ocr_text is None:
         total_chars = sum(len(p) for p in pages)
         avg_chars = total_chars / len(pages)
@@ -116,9 +114,9 @@ def ingest(state: GraphState) -> dict[str, Any]:
                 logger.warning("ingest: OCR fallback failed (%s): %s", engine, exc)
                 errors.append(f"ingest: OCR fallback failed engine={engine} error={exc}")
             else:
-                # Surface the engine choice as an informational note (rule 12
-                # — surface uncertainty). NOT an error; the UI renders notes
-                # in a distinct, non-alarming info block.
+                # Surface the engine choice as an informational note.
+                # NOT an error; the UI renders notes in a distinct,
+                # non-alarming info block.
                 notes.append(
                     f"OCR fallback engaged: {engine} ran server-side on {len(ocr_pages)} "
                     f"image-based pages, produced {len(ocr_text):,} characters of text."
@@ -129,14 +127,14 @@ def ingest(state: GraphState) -> dict[str, Any]:
                     pages = ocr_pages
 
     # Source-selection policy: flag pages where pdfplumber returned empty text
-    # when OCR text is available (rule 7 — surface, don't average).
+    # when OCR text is available.
     if ocr_text:
         for i, page_text in enumerate(pages):
             if not page_text.strip():
                 errors.append(
                     f"ingest: page {i + 1} returned empty from pdfplumber; "
                     "OCR text is available at raw.ocr_text but page-aligned "
-                    "slicing is not implemented in M1"
+                    "slicing is not implemented"
                 )
 
     raw = RawStatement(
@@ -152,9 +150,8 @@ def _pick_ocr_engine() -> str:
     """Return ``"azure_di"`` if Azure DI env vars are set, else ``"tesseract"``.
 
     Decision is made per-call (cheap env lookup) so the container can be
-    configured at runtime without a rebuild. Per task.md, txt_path is optional
-    and the service must handle unseen banks — Azure DI matches the working
-    baseline (Task/ixonia_binder2_ocr.txt is Azure DI output).
+    configured at runtime without a rebuild. txt_path is optional and the
+    service must handle unseen banks — Azure DI matches the working baseline.
     """
     if os.environ.get("AZURE_DI_ENDPOINT") and os.environ.get("AZURE_DI_KEY"):
         return "azure_di"
@@ -265,14 +262,6 @@ def _run_tesseract_ocr(pdf_path: str) -> tuple[list[str], str]:
             # output_file="-" + output_type="none" tells ocrmypdf 17.x to skip
             # writing a PDF entirely; we only want the sidecar text. Without
             # the `-`, OcrOptions validation rejects the call.
-            #
-            # Tesseract tuning experiment (2026-05-13): oversample=400,
-            # tesseract_pagesegmode=6, tesseract_oem=1, disable dawgs,
-            # deskew/clean. Empirical result on Task/Binder2_Redacted.pdf:
-            # 3x slower (6m18 vs 2m13), 2 periods lost (8 vs 10), account
-            # digits still mis-recognised. Digit confusion is font-level —
-            # not fixable by Tesseract config. Default settings restored.
-            # See docs/architecture.md for the Azure DI escalation path.
             ocrmypdf.ocr(
                 input_file_or_options=pdf_path,
                 output_file="-",

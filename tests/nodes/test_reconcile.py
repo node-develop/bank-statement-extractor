@@ -1,4 +1,4 @@
-"""Tests for src/nodes/reconcile.py — business-intent assertions (CLAUDE.md rule 9).
+"""Tests for src/nodes/reconcile.py — business-intent assertions.
 
 Seven tests covering:
   1. Happy path: Ixonia Apr-2025 etalon.
@@ -116,7 +116,7 @@ def _make_state(
 # Test 1 — happy path: Ixonia Apr-2025 etalon
 # ---------------------------------------------------------------------------
 
-# Etalon from docs/ixonia-etalon.md row 1:
+# Ixonia Apr-2025 etalon:
 #   beginning=597068.70, ending=509121.59
 #   deposits_total=1214254.05, deposits_count=81
 #   withdrawals_total=1302201.16, withdrawals_count=111
@@ -184,8 +184,7 @@ def test_reconcile_off_by_two_cents_fails() -> None:
     from src.nodes.reconcile import reconcile
 
     # Build transactions with credits summing to deposits_total + 0.02 so the
-    # mismatch strictly exceeds EPSILON (0.01 is the tolerance boundary —
-    # see docs/architecture.md "within ε ($0.01)").
+    # mismatch strictly exceeds EPSILON (0.01 is the tolerance boundary).
     bad_total = _APR_DEP_TOTAL + Decimal("0.02")
     state = _make_state(
         chunks=[_make_chunk(_APR_CHUNK_ID)],

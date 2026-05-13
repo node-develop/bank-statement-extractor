@@ -9,8 +9,7 @@ before ``reconcile``.
 Responsibilities:
 - Log per-chunk arrival counts at INFO for traceability.
 - Verify that each accumulating list contains exactly ``len(period_chunks)``
-  entries; if not, append a specific error to ``errors[]`` (rule 7 — surface
-  conflicts, never silently swallow them).
+  entries; if not, append a specific error to ``errors[]``.
 - Return ``{}`` (empty delta) when counts are balanced; ``{"errors": [...]}``
   otherwise.
 """

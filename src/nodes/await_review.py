@@ -1,18 +1,18 @@
 """``await_review`` graph node — pause via LangGraph ``interrupt()`` for HITL.
 
-Phase 3 (PRD §5.4) — routes here from ``route_after_verifier`` when:
+Routes here from ``route_after_verifier`` when:
 - ``cumulative_cost_usd >= HARD_COST_CAP_USD``, OR
 - ``total_suspects > 3``, OR
 - ``retry_count >= 2``
 
-Layer boundary (per PRD §5.4 / critic Finding 8): this node does NOT write to
-``reviews.sqlite`` directly.  The API layer (POST /extract handler) detects
-the interrupt via ``result["__interrupt__"]`` on the graph response and inserts
-the ``pending_reviews`` row.  This keeps ``src/nodes/`` free of ``src/api/``
+Layer boundary: this node does NOT write to ``reviews.sqlite`` directly.  The
+API layer (POST /extract handler) detects the interrupt via
+``result["__interrupt__"]`` on the graph response and inserts the
+``pending_reviews`` row.  This keeps ``src/nodes/`` free of ``src/api/``
 imports.
 
 ``reason`` is re-derived inline from the same conditions ``route_after_verifier``
-used — no extra ``await_reason`` state key needed (PRD GAP-D resolution).
+used — no extra ``await_reason`` state key needed.
 """
 
 from __future__ import annotations

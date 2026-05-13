@@ -1,17 +1,13 @@
 /* =============================================================
    Bank Statement Extractor — colors & type tokens
-   A multi-agent statement-parsing tool. Aesthetic referenced
-   from Dobs.AI: deep purple accent, lavender tints, near-white
-   paper background, very bold headings on ink-black.
+   Deep purple accent, lavender tints, near-white paper background.
    ============================================================= */
 
 /* -----  Fonts  ----- */
 /*
- * Self-hosted woff2 — bundled from the reference design HTML
- * (handoff_package/Bank Statement Extractor _standalone_.html).
- * Files live in frontend/public/fonts/ and are served from /fonts/*.
- * Eight files, ~500 KB total: Inter + JetBrains Mono + Newsreader,
- * latin + latin-ext subsets.
+ * Self-hosted woff2. Files live in frontend/public/fonts/ and are served
+ * from /fonts/*. Eight files, ~500 KB total: Inter + JetBrains Mono +
+ * Newsreader, latin + latin-ext subsets.
  */
 @font-face {
   font-family: "Inter";
@@ -415,9 +411,8 @@
 }
 
 /* =============================================================
-   SIGNATURE EFFECT — hand-drawn purple highlight under a phrase
-   (mirrors the "in action" mark on Dobs.AI). Use sparingly.
-   <span class="hl">in action</span>
+   SIGNATURE EFFECT — hand-drawn purple highlight under a phrase.
+   Use sparingly. <span class="hl">in action</span>
    ============================================================= */
 .hl {
   position: relative;

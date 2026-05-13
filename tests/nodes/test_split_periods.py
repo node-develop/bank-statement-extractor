@@ -1,4 +1,4 @@
-"""Tests for src/nodes/split_periods.py — business-intent assertions (rule 9).
+"""Tests for src/nodes/split_periods.py — business-intent assertions.
 
 The Ixonia regression fixture tests run against Task/ixonia_binder2_ocr.txt
 (read-only).  They are skipped when the fixture is absent.
@@ -294,7 +294,7 @@ def test_split_periods_tesseract_inline_amount() -> None:
     """Tesseract appends the dollar amount to the anchor line on a single line.
 
     Azure DI puts the amount on the next line; Tesseract concatenates it after
-    the year. Regex must match BOTH shapes (rule 4 — generalise to unseen banks).
+    the year. Regex must match BOTH shapes.
     """
     from src.nodes.split_periods import split_periods
 

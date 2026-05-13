@@ -1,6 +1,6 @@
 """``reconcile`` graph node — pure-Python per-period reconciliation.
 
-Deterministic arithmetic only — no LLM, no IO (CLAUDE.md rules 5, 11).
+Deterministic arithmetic only — no LLM, no IO.
 
 Invariants checked per period chunk
 -------------------------------------

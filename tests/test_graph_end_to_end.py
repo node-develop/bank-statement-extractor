@@ -45,7 +45,7 @@ from src.models import (
 _OCR_PATH = Path("/Users/izual/PycharmProjects/bank-statement-analizer/Task/ixonia_binder2_ocr.txt")
 
 # ---------------------------------------------------------------------------
-# Etalon values for Apr 2025 (docs/ixonia-etalon.md, period #1)
+# Etalon values for Apr 2025
 # ---------------------------------------------------------------------------
 _APR_CHUNK_ID = "period_01"
 _APR_BEGINNING = Decimal("597068.70")
@@ -269,7 +269,7 @@ class TestE2ESinglePeriodReconciles:
                 "verifier_reports": [],
                 "retry_count": 0,
                 "errors": [],
-                # Phase 3 — required by the _add_decimal reducer in GraphState.
+                # Required by the _add_decimal reducer in GraphState.
                 "cumulative_cost_usd": Decimal("0"),
             }
             config: dict[str, Any] = {
@@ -298,10 +298,9 @@ class TestE2ESinglePeriodReconciles:
 
 
 class TestE2ECriticRunsOnFailure:
-    """Phase 3: when verifier flags 1-3 suspects, critic is invoked.
+    """When verifier flags 1-3 suspects, critic is invoked.
 
-    This replaces the M2 'count mismatch' scenario.  In the new topology
-    reconciliation runs only on verifier-clean chunks; verifier suspects
+    Reconciliation runs only on verifier-clean chunks; verifier suspects
     drive routing to ``critic`` (1-3) or ``await_review`` (>3).
     """
 
@@ -416,7 +415,7 @@ class TestE2ECriticRunsOnFailure:
 
         # Structural invariant: when reconcile DID run, reconciliations must
         # NOT accumulate across critic-loop retries — ``_reduce_by_chunk_id``
-        # keeps the list at exactly one entry per chunk_id (rule 12).  Skip
+        # keeps the list at exactly one entry per chunk_id.  Skip
         # this assertion when the graph paused at await_review (reconcile
         # never ran) since the invariant only applies post-reconcile.
         n_chunks = len(result_state["period_chunks"])

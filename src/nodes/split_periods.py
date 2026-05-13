@@ -1,11 +1,7 @@
 """``split_periods`` graph node — deterministic OCR-text period splitter.
 
-Pure Python, no LLM (CLAUDE.md rule 5).  Splits the full OCR text into one
-``PeriodChunk`` per statement period using regex anchors and a line-scan.
-
-Ixonia regression fixture (architecture.md):
-  10 chunks expected, Beginning Balance anchors at OCR lines (1-based):
-  38, 1133, 2379, 3399, 4410, 5297, 6280, 6620, 7591, 8632.
+Pure Python, no LLM.  Splits the full OCR text into one ``PeriodChunk`` per
+statement period using regex anchors and a line-scan.
 """
 
 from __future__ import annotations
@@ -312,7 +308,7 @@ def _resolve_period_pages(
             last = first_pages[k + 1] - 1
         else:
             last = n_pages
-        # Defensive cap (rule 12 — surface uncertainty rather than overshoot).
+        # Defensive cap — surface uncertainty rather than overshoot.
         last = max(first, min(last, n_pages))
         ranges.append((first, last))
 

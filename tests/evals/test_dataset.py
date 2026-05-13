@@ -1,4 +1,4 @@
-"""Tests for src/evals/datasets/ixonia.jsonl (rule 9 — business intent)."""
+"""Tests for src/evals/datasets/ixonia.jsonl — business intent."""
 
 from __future__ import annotations
 
@@ -61,7 +61,7 @@ def test_dataset_schema(entries: list[dict]) -> None:
         assert isinstance(s["deposits_count"], int)
         assert isinstance(s["withdrawals_count"], int)
         assert et["reconciled"] is True
-        # tx_count must equal deposits_count + withdrawals_count (rule 12)
+        # tx_count must equal deposits_count + withdrawals_count
         assert et["tx_count"] == s["deposits_count"] + s["withdrawals_count"], (
             f"{e['chunk_id']}: tx_count != deposits + withdrawals"
         )

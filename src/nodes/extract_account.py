@@ -161,7 +161,7 @@ def _invoke_llm(chunk: PeriodChunk, text: str) -> dict[str, Any]:
     user = HumanMessage(content=text)
 
     # include_raw=True → {"raw": AIMessage, "parsed": Account, "parsing_error": None}
-    # so we can read usage_metadata for cost tracking (PRD §8.2).
+    # so we can read usage_metadata for cost tracking.
     # Defensive: if the LLM (or a test mock) returns the parsed model directly
     # instead of the include_raw dict, fall back gracefully — usage_metadata
     # won't be available and cost will be 0 for that call.
@@ -195,7 +195,7 @@ def _invoke_llm(chunk: PeriodChunk, text: str) -> dict[str, Any]:
     # OUTSIDE the truncated chunk text (extract_account truncates to 6000
     # chars but the header sits above the Beginning Balance anchor and may
     # be outside the period slice).  split_periods already did the regex
-    # lookback — trust it (rule 5: model only for judgment).
+    # lookback — trust it.
     last4 = chunk.account_hint_last4 or raw_result.account_last4
     account = Account(
         chunk_id=chunk.chunk_id,

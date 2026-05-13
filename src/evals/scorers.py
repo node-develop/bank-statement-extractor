@@ -1,4 +1,4 @@
-"""Pure-Python scoring logic for the evaluation harness (rule 9).
+"""Pure-Python scoring logic for the evaluation harness.
 
 Compares a ``PeriodResult`` against an etalon dict from
 ``src/evals/datasets/ixonia.jsonl``.  Returns a ``PeriodScore`` with all

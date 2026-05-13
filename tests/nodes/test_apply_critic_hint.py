@@ -1,6 +1,6 @@
-"""Unit tests for src/nodes/apply_critic_hint.py — PRD §4.2.2.
+"""Unit tests for src/nodes/apply_critic_hint.py.
 
-Three scenarios per the PRD:
+Three scenarios:
 1. happy path — one Send dispatched with hint prepended to BOTH pdf_text and ocr_slice
 2. missing pending_hint — returns []
 3. unknown chunk_id in hint — returns []
@@ -63,7 +63,7 @@ def test_apply_critic_hint_dispatches_one_send() -> None:
     assert send.node == "extract_transactions"
     annotated_chunk: PeriodChunk = send.arg
     assert annotated_chunk.chunk_id == "period_01"
-    # Hint block prepended to BOTH text sources (PRD §5.5 dual-injection).
+    # Hint block prepended to BOTH text sources.
     assert "Critic hint" in annotated_chunk.pdf_text
     assert "re-check row 5 amount" in annotated_chunk.pdf_text
     assert annotated_chunk.pdf_text.endswith("ORIGINAL_PDF_TEXT")

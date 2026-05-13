@@ -115,7 +115,7 @@ export async function submitReview(
 }
 
 // ---------------------------------------------------------------------------
-// SSE streaming variant (Phase 6) — POST /extract/stream
+// SSE streaming — POST /extract/stream
 // ---------------------------------------------------------------------------
 
 type StreamEvent =

@@ -1,4 +1,4 @@
-"""Tests for src/nodes/extract_summary.py — business-intent assertions (rule 9).
+"""Tests for src/nodes/extract_summary.py — business-intent assertions.
 
 All tests monkeypatch ``_get_llm`` so no real Anthropic API key is needed.
 """
@@ -200,7 +200,7 @@ def test_extract_summary_truncates_large_text() -> None:
 
 def test_extract_summary_decimal_precision_round_trip() -> None:
     """Decimal values from the Apr-2025 etalon must survive a JSON round-trip
-    without precision loss (CLAUDE.md: Decimal, not float).
+    without precision loss (Decimal, not float).
     """
     from src.nodes.extract_summary import extract_summary
 

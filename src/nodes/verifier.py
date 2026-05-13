@@ -182,10 +182,6 @@ def verifier(state: GraphState) -> dict[str, list[VerifierReport]]:
     """Run C1-C6 on every (summary, transactions) pair grouped by chunk_id.
 
     Returns ``{"verifier_reports": [VerifierReport, ...]}``.
-
-    Note: ``verifier_reports`` is not yet wired into ``GraphState`` (Phase 2
-    is purely additive — graph wiring happens in Phase 3).  The function is
-    callable and unit-tested standalone.
     """
     summaries = {s.chunk_id: s for s in state.get("summaries", [])}
     grouped: dict[str, list[Transaction]] = {}

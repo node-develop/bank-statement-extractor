@@ -72,9 +72,6 @@
   ],
 
   "_notes": [
-    "TODO: Verify 'buildType' field name — Dokploy 0.29 docs use 'applicationType' in some places and 'buildType' in others. If the UI rejects this manifest, rename 'buildType' to 'applicationType'.",
-    "TODO: Verify 'livenessPath' field name — the SKILL.md example uses 'livenessProbe: {path}'. Rename to 'livenessProbe': {'path': '/healthz'} if the 0.29 schema validator rejects the flat form.",
-    "TODO: Verify 'certificateType' accepted values for your Dokploy host (common: 'letsencrypt', 'custom', 'none').",
     "Storage: SQLite checkpoint under /app/data — Dokploy must back the named volume 'bsa_data' with persistent storage so reconciliation state survives a redeploy.",
     "Set BSA_API_DOMAIN and BSA_FRONTEND_DOMAIN in Dokploy's project environment before first deploy.",
     "FRONTEND_ORIGIN in the api application must match the scheme+host of BSA_FRONTEND_DOMAIN (CORS)."

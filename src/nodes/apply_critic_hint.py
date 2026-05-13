@@ -1,7 +1,5 @@
 """``apply_critic_hint`` node — re-dispatch ONE extractor for ONE chunk.
 
-Phase 3 (PRD §4.2.2) — resolves critic GAP-F.
-
 After the ``critic`` node emits a ``CriticHint`` into ``state["pending_hint"]``,
 this node turns that hint into a list of ``Send`` objects that re-run exactly
 one extractor for exactly one chunk.  The critic's natural-language hint is
@@ -63,7 +61,7 @@ def apply_critic_hint(state: GraphState) -> list[Send]:
 
     # Prepend the critic's hint to BOTH pdf_text and ocr_slice so the extractor
     # sees it regardless of which source it prefers (same dual-injection rule as
-    # apply_human_corrections per PRD §5.5 Finding 5).
+    # apply_human_corrections).
     hint_block = (
         "## Critic hint (treat as ground truth; do not contradict)\n"
         f"- {hint.hint}\n\n"
