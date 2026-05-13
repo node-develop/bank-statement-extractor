@@ -33,6 +33,7 @@ from fastapi.responses import JSONResponse
 
 from src.api.logging import get_logger
 from src.api.routers.extract import router as extract_router
+from src.api.routers.extract_stream import router as extract_stream_router
 from src.api.routers.reviews import router as reviews_router
 from src.graph.builder import build_graph
 from src.graph.checkpointer import build_async_checkpointer
@@ -131,6 +132,7 @@ def create_app() -> FastAPI:
     # Routers
     # ------------------------------------------------------------------
     application.include_router(extract_router)
+    application.include_router(extract_stream_router)
     application.include_router(reviews_router)
 
     # ------------------------------------------------------------------
