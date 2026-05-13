@@ -250,3 +250,65 @@ def test_extract_transactions_running_balance_decimal_preserved() -> None:
     assert isinstance(tx.running_balance, Decimal), (
         f"running_balance must be Decimal, got {type(tx.running_balance)}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Input-source selection tests — pdf_text primary, ocr_slice fallback
+# ---------------------------------------------------------------------------
+
+
+def test_pdf_text_is_preferred_when_both_present() -> None:
+    """When both pdf_text and ocr_slice are non-empty, the LLM gets pdf_text."""
+    from src.nodes.extract_transactions import extract_transactions
+
+    captured_messages: list[Any] = []
+
+    def _capture_invoke(messages: list[Any]) -> Any:
+        captured_messages.extend(messages)
+        return _make_transaction_list_result([])
+
+    structured = MagicMock()
+    structured.invoke.side_effect = _capture_invoke
+    llm = MagicMock()
+    llm.with_structured_output.return_value = structured
+
+    chunk = _make_chunk(
+        chunk_id="period_01",
+        pdf_text="PDF TEXT MARKER 12345",
+        ocr_slice="OCR SLICE MARKER 67890",
+    )
+
+    with patch("src.nodes.extract_transactions._get_llm", return_value=llm):
+        extract_transactions(chunk)
+
+    human_text = captured_messages[1].content  # [SystemMessage, HumanMessage]
+    assert "PDF TEXT MARKER" in human_text
+    assert "OCR SLICE MARKER" not in human_text
+
+
+def test_ocr_slice_used_when_pdf_text_is_whitespace() -> None:
+    """pdf_text empty/whitespace → fall back to ocr_slice."""
+    from src.nodes.extract_transactions import extract_transactions
+
+    captured_messages: list[Any] = []
+
+    def _capture_invoke(messages: list[Any]) -> Any:
+        captured_messages.extend(messages)
+        return _make_transaction_list_result([])
+
+    structured = MagicMock()
+    structured.invoke.side_effect = _capture_invoke
+    llm = MagicMock()
+    llm.with_structured_output.return_value = structured
+
+    chunk = _make_chunk(
+        chunk_id="period_01",
+        pdf_text="   \n  ",  # whitespace only
+        ocr_slice="OCR SLICE MARKER 67890",
+    )
+
+    with patch("src.nodes.extract_transactions._get_llm", return_value=llm):
+        extract_transactions(chunk)
+
+    human_text = captured_messages[1].content
+    assert "OCR SLICE MARKER" in human_text
