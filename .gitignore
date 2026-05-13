@@ -11,7 +11,8 @@ __pycache__/
 graph.sqlite
 graph.sqlite-*
 traces/
-src/evals/reports/
+src/evals/reports/*
+!src/evals/reports/.gitkeep
 
 # Frontend
 frontend/node_modules/
