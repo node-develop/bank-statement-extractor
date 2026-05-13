@@ -11,10 +11,8 @@
   document's purpose (paperless-statement marketing collateral).
 - **Provenance note:** WebFetch returned valid `%PDF-1.5` bytes
   (`Title: Paperless Statement Sample`, creator `JPMorgan Chase & Co.`,
-  86 KB, 1 page). The binary is cached locally at
-  `/Users/izual/.claude/projects/-Users-izual-PycharmProjects-bank-statement-analizer/f5780384-bd3b-4b0a-b02f-50506b3d93ea/tool-results/webfetch-1778637197062-7835rp.pdf`
-  but the agent sandbox blocked `cp`/`install`/`python shutil` from staging it
-  to `sample.pdf` in this directory. Re-download manually with the URL above
+  86 KB, 1 page).
+  Re-download manually with the URL above
   (any browser or `curl -o sample.pdf <URL>`).
 
 ## Layout summary

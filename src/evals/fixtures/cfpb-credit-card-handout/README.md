@@ -10,10 +10,8 @@
   (17 U.S.C. 105). Document carries fictional "Susan Doe / 1234 Main Street,
   Anytown, USA" — no real PII.
 - **Provenance note:** WebFetch returned valid `%PDF-1.7` bytes (58 KB,
-  1 page). Binary cached at
-  `/Users/izual/.claude/projects/-Users-izual-PycharmProjects-bank-statement-analizer/f5780384-bd3b-4b0a-b02f-50506b3d93ea/tool-results/webfetch-1778637198120-tkmf4i.pdf`;
-  agent sandbox blocked file copy out of cache. Re-download manually with the
-  URL above.
+  1 page).
+  Re-download manually with the URL above.
 
 ## Layout summary
 

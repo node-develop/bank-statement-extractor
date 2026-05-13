@@ -9,10 +9,8 @@
   customer "Savvy Saver / 360 Market St. / Anywhere, US 12345"; statement
   date 03/31/2013. No real PII.
 - **Provenance note:** WebFetch returned valid `%PDF-1.6` bytes (307 KB,
-  1 page). Binary cached at
-  `/Users/izual/.claude/projects/-Users-izual-PycharmProjects-bank-statement-analizer/f5780384-bd3b-4b0a-b02f-50506b3d93ea/tool-results/webfetch-1778637303854-3hxnwd.pdf`;
-  agent sandbox blocked file copy out of cache. Re-download manually with the
-  URL above.
+  1 page).
+  Re-download manually with the URL above.
 
 ## Layout summary
 

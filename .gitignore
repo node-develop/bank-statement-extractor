@@ -27,6 +27,7 @@ frontend/dist/
 # Secrets / local
 .env
 .env.*
+!.env.example
 *.key
 *.pem
 CLAUDE.local.md
