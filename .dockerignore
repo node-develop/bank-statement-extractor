@@ -1,17 +1,76 @@
-.git
-.idea
-.vscode
-.venv
-.mypy_cache
-.ruff_cache
-.pytest_cache
-__pycache__
+# bank-statement-analizer — .dockerignore
+# Build context is the repository root for all infra/Dockerfile* builds.
+# Goal: keep the build context under 50 MB.
+
+# ---------------------------------------------------------------------------
+# Python runtime / tooling artefacts
+# ---------------------------------------------------------------------------
+.venv/
+__pycache__/
 *.py[cod]
-Task
-docs
-tests
-frontend/node_modules
-frontend/dist
-graph.sqlite*
-traces
-.env*
+*.pyo
+*.pyd
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# ---------------------------------------------------------------------------
+# SQLite checkpointer files (never baked into images)
+# ---------------------------------------------------------------------------
+graph.sqlite
+graph.sqlite-shm
+graph.sqlite-wal
+*.sqlite
+*.sqlite3
+traces/
+
+# ---------------------------------------------------------------------------
+# Frontend build artefacts (not needed for the backend image;
+# the frontend Dockerfile builder stage runs pnpm build internally)
+# ---------------------------------------------------------------------------
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# ---------------------------------------------------------------------------
+# Reference / test data (read-only; contains large PDFs)
+# ---------------------------------------------------------------------------
+Task/
+
+# ---------------------------------------------------------------------------
+# Documentation and markdown (not needed at runtime)
+# ---------------------------------------------------------------------------
+docs/
+*.md
+!README.md
+
+# ---------------------------------------------------------------------------
+# Tests (not shipped in images)
+# ---------------------------------------------------------------------------
+tests/
+
+# ---------------------------------------------------------------------------
+# Dev / secrets / CI
+# ---------------------------------------------------------------------------
+.env
+.env.*
+*.key
+*.pem
+secrets/
+.github/
+.git/
+
+# ---------------------------------------------------------------------------
+# Editor / OS noise
+# ---------------------------------------------------------------------------
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# ---------------------------------------------------------------------------
+# Claude / project-meta (not needed in images)
+# ---------------------------------------------------------------------------
+.claude/
+.mcp.json
