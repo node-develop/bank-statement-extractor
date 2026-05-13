@@ -53,16 +53,38 @@ def split_periods(state: GraphState) -> dict[str, Any]:
     """
     raw = state["raw"]
     ocr_text: str | None = raw.ocr_text
+    errors: list[str] = []
 
+    # OCR is optional. When the caller did not supply a .txt companion (or
+    # supplied an empty one), fall back to the pdfplumber-extracted per-page
+    # text joined into a single string. Regex anchors may not match the
+    # pdfplumber output (different whitespace + line breaks than Azure OCR),
+    # but the whole-doc fallback below (n_chunks == 0) still emits one
+    # chunk covering the entire document. The extractor prompts handle the
+    # rest via few-shot exemplars.
     if ocr_text is None or not ocr_text.strip():
-        logger.warning("split_periods: raw.ocr_text is empty; returning no chunks")
-        return {
-            "period_chunks": [],
-            "errors": ["split_periods: raw.ocr_text is empty"],
-        }
+        joined_pages = "\n".join(raw.pages) if raw.pages else ""
+        if joined_pages.strip():
+            logger.info(
+                "split_periods: raw.ocr_text empty; falling back to "
+                "%d pdfplumber pages joined as text",
+                len(raw.pages),
+            )
+            ocr_text = joined_pages
+            errors.append(
+                "split_periods: no OCR text supplied; using pdfplumber page text. "
+                "Ixonia-style anchors may not match — whole-doc chunk fallback engaged."
+            )
+        else:
+            logger.warning("split_periods: raw.ocr_text is empty and pdfplumber pages have no text")
+            return {
+                "period_chunks": [],
+                "errors": [
+                    "split_periods: raw.ocr_text is empty and pdfplumber pages have no text"
+                ],
+            }
 
     lines = ocr_text.splitlines()
-    errors: list[str] = []
 
     # ------------------------------------------------------------------
     # Scan once for all Beginning and Ending anchors

@@ -213,24 +213,46 @@ def test_split_periods_two_line_account() -> None:
     assert chunks[0].account_hint_last4 == "1664"
 
 
-def test_split_periods_none_ocr_text() -> None:
-    """None ocr_text returns empty chunks and a specific error."""
+def test_split_periods_none_ocr_text_and_no_pages_returns_empty() -> None:
+    """No OCR and no pdfplumber text → empty chunks + specific error."""
     from src.nodes.split_periods import split_periods
 
+    # _make_state default `pages=[""]` simulates pdfplumber returning nothing.
     result = split_periods(_make_state(None))
     assert result["period_chunks"] == []
-    assert any("ocr_text is empty" in e for e in result["errors"]), (
-        f"Expected 'ocr_text is empty' error, got {result['errors']}"
+    assert any("pdfplumber pages have no text" in e for e in result["errors"]), (
+        f"Expected pdfplumber-no-text error, got {result['errors']}"
     )
 
 
-def test_split_periods_empty_string_ocr_text() -> None:
-    """Empty-string ocr_text returns empty chunks and a specific error."""
+def test_split_periods_empty_ocr_text_and_no_pages_returns_empty() -> None:
+    """Empty-string OCR with empty pages → still 0 chunks."""
     from src.nodes.split_periods import split_periods
 
     result = split_periods(_make_state("   \n  "))
     assert result["period_chunks"] == []
-    assert any("ocr_text is empty" in e for e in result["errors"])
+    assert any("pdfplumber pages have no text" in e for e in result["errors"])
+
+
+def test_split_periods_falls_back_to_pdfplumber_pages_when_no_ocr() -> None:
+    """No OCR but pdfplumber pages have real text → 1 whole-doc chunk."""
+    from src.nodes.split_periods import split_periods
+
+    pages = [
+        "Bank of Example — Statement\nAccount Number: 1234\n",
+        "01/02/2025  Deposit  $100.00  $1,100.00\n",
+    ]
+    result = split_periods(_make_state(None, pages=pages))
+    chunks = result["period_chunks"]
+    assert len(chunks) == 1, f"Expected 1 fallback chunk, got {len(chunks)}: {chunks}"
+    assert chunks[0].chunk_id == "period_01"
+    assert chunks[0].account_hint_last4 == "1234"
+    # Fallback uses joined-page text as the ocr_slice
+    assert "Bank of Example" in (chunks[0].ocr_slice or "")
+    # An informational note is appended; not a fatal error.
+    assert any("no OCR text supplied" in e for e in result["errors"]), (
+        f"Expected 'no OCR text supplied' note, got {result['errors']}"
+    )
 
 
 def test_split_periods_ocr_slice_spans_beg_to_end() -> None:
