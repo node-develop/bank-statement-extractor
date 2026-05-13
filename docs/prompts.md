@@ -45,6 +45,13 @@ Empty until the first iteration lands.
 - Eval after: n/a (graph wiring lands later in M2)
 - Verdict: keep
 
+## 2026-05-13 — extract_transactions v2
+- Change: added EXHAUSTIVENESS REQUIREMENT section at top of instructions (before schema): model must read deposits_count + withdrawals_count from the Balance Summary block, compute expected_total, process every row from BEGINNING BALANCE to ENDING BALANCE without stopping early, and self-check count before returning. Changed skip rule to emit null running_balance rather than skip the whole row (reduces silent row loss). Added explicit note "abbreviated for brevity; real output covers ALL rows" on the exemplars heading. Bumped version frontmatter 1→2.
+- Why: Apr 2025 chunk (192 expected transactions) returned only ~12. Root cause: (1) no count anchor — model had no target to aim for; (2) exemplars showed 3 rows total, anchoring the model's structured-output path to "small list = complete"; (3) the skip-row instruction was too broad and invited omission under uncertainty. The exhaustiveness block gives Claude a concrete number to commit to and an explicit "do not stop" imperative, which is the documented pattern for forcing exhaustive list generation on Sonnet.
+- Eval before: ~12 transactions extracted for Apr 2025 (etalon: 192)
+- Eval after: expected ≥150, target >190
+- Verdict: pending evaluator run
+
 ## 2026-05-12 — critic v1
 - Change: initial critic prompt for Haiku 4.5; reconciliation invariant, diagnostic priority order (count mismatch → delta-matches-row → balance-implausible → account-hint-mismatch), CriticHint output schema, 1 few-shot exemplar.
 - Why: M2 critic_loop node needs a structured hint to select which extractor of which chunk to re-run; priority ordering ensures the cheapest-to-fix cause is tried first, capping at 2 retries total.

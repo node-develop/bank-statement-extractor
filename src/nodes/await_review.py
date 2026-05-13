@@ -27,24 +27,54 @@ logger = get_logger(__name__)
 
 def _build_partial_periods(state: GraphState) -> list[dict[str, Any]]:
     """Assemble a best-effort per-chunk summary for the human reviewer."""
+    # On the FIRST pass through await_review, state values are Pydantic
+    # models (Account, Summary, Transaction, …). When the graph resumes
+    # after POST /review/{id}, LangGraph rehydrates state from the
+    # checkpointer; depending on the codec, some fields come back as
+    # plain dicts. Use a defensive helper that handles both shapes.
     chunks = state.get("period_chunks", [])
-    accounts = {a.chunk_id: a for a in state.get("accounts", [])}
-    summaries = {s.chunk_id: s for s in state.get("summaries", [])}
+    accounts = {_get_chunk_id(a): a for a in state.get("accounts", [])}
+    summaries = {_get_chunk_id(s): s for s in state.get("summaries", [])}
     txs_by: dict[str, list[Any]] = {}
     for t in state.get("transactions", []):
-        txs_by.setdefault(t.chunk_id, []).append(t)
+        txs_by.setdefault(_get_chunk_id(t), []).append(t)
     out: list[dict[str, Any]] = []
     for c in chunks:
-        cid = c.chunk_id
+        cid = _get_chunk_id(c)
         out.append(
             {
                 "chunk_id": cid,
-                "account": accounts[cid].model_dump() if cid in accounts else None,
-                "summary": summaries[cid].model_dump() if cid in summaries else None,
+                "account": _to_dict(accounts[cid]) if cid in accounts else None,
+                "summary": _to_dict(summaries[cid]) if cid in summaries else None,
                 "tx_count": len(txs_by.get(cid, [])),
             }
         )
     return out
+
+
+def _to_dict(obj: Any) -> dict[str, Any] | None:
+    """Coerce a pydantic model OR plain dict to a dict.
+
+    Required because LangGraph state rehydration can return either shape
+    depending on the checkpointer codec — see comments in _build_partial_periods.
+    """
+    if obj is None:
+        return None
+    if hasattr(obj, "model_dump"):
+        result: dict[str, Any] = obj.model_dump()
+        return result
+    if isinstance(obj, dict):
+        return obj
+    raise TypeError(f"_to_dict: cannot coerce {type(obj).__name__} to dict")
+
+
+def _get_chunk_id(obj: Any) -> str:
+    """Pull `chunk_id` from a pydantic model OR plain dict."""
+    if hasattr(obj, "chunk_id"):
+        return str(obj.chunk_id)
+    if isinstance(obj, dict):
+        return str(obj.get("chunk_id", ""))
+    raise TypeError(f"_get_chunk_id: cannot read chunk_id from {type(obj).__name__}")
 
 
 def await_review(state: GraphState) -> dict[str, Any]:
@@ -74,7 +104,17 @@ def await_review(state: GraphState) -> dict[str, Any]:
     from src.api.pricing import HARD_COST_CAP_USD
 
     reports = state.get("verifier_reports", [])
-    total_suspects = sum(len(r.suspects) for r in reports)
+
+    def _suspects_of(report: Any) -> list[Any]:
+        """Suspects attribute may be on a pydantic VerifierReport or a dict."""
+        if hasattr(report, "suspects"):
+            return list(report.suspects)
+        if isinstance(report, dict):
+            return list(report.get("suspects") or [])
+        return []
+
+    flat_suspects = [s for r in reports for s in _suspects_of(r)]
+    total_suspects = len(flat_suspects)
     retry = state.get("retry_count", 0)
     cost_capped = state.get("cumulative_cost_usd", _D("0")) >= HARD_COST_CAP_USD
 
@@ -85,8 +125,11 @@ def await_review(state: GraphState) -> dict[str, Any]:
     else:
         reason = "suspects_exceeded"
 
+    # Suspects can be pydantic VerifierSuspect instances OR plain dicts
+    # depending on whether this is the first await_review pass or a resume.
+    # _to_dict handles both. (Filter Nones in case _to_dict returns None.)
     payload: dict[str, Any] = {
-        "suspects": [s.model_dump() for r in reports for s in r.suspects],
+        "suspects": [d for s in flat_suspects if (d := _to_dict(s)) is not None],
         "reason": reason,
         "partial_periods": _build_partial_periods(state),
     }

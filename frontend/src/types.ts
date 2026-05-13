@@ -114,6 +114,9 @@ export interface ExtractResult {
   periods: PeriodResult[];
   statement_sha256: string;
   langsmith_run_url: string | null;
+  /** Real problems — extraction failures, mismatches, corrupt input. */
   errors: string[];
+  /** Informational pipeline notices (OCR engine, critic iterations). */
+  notes?: string[];
   pending_review?: PendingReview | null;
 }

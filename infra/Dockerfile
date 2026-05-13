@@ -67,8 +67,22 @@ FROM python:3.14-slim AS runtime
 # tini — minimal init (PID 1 reaper) so SIGTERM propagates correctly.
 # No curl/wget — healthcheck uses python -c (saves a layer).
 # No libpq5 — Postgres dropped; SQLite ships with Python.
+#
+# OCR fallback (ocrmypdf) requires system binaries:
+#   tesseract-ocr + tesseract-ocr-eng — the OCR engine + English language data.
+#   poppler-utils — pdftoppm/pdftocairo, used by ocrmypdf to rasterize PDF pages.
+#   ghostscript — required by ocrmypdf for PDF rendering and image extraction.
+#   unpaper — page cleanup (deskew, border removal) for image-based scans.
+# Approx +280 MB; trades image size for end-to-end OCR of image-based PDFs
+# (task.md contract: txt_path is optional, must handle scanned bank statements).
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends tini \
+    && apt-get install -y --no-install-recommends \
+        tini \
+        tesseract-ocr \
+        tesseract-ocr-eng \
+        poppler-utils \
+        ghostscript \
+        unpaper \
     && rm -rf /var/lib/apt/lists/*
 
 # Create a non-root user (uid 10001 is arbitrary but non-system).

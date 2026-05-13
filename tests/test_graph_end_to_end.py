@@ -396,20 +396,22 @@ class TestE2ECriticRunsOnFailure:
         # producing >3 verifier suspects → await_review).  Either outcome is
         # valid for THIS test — its sole purpose is to verify CRITIC RAN at
         # least once before that decision was made.
-        all_errors: list[str] = []
+        # Critic now writes its diagnostic to notes[] (informational), not
+        # errors[]; the assertion follows.
+        all_notes: list[str] = []
         if "final" in result_state:
             final: ExtractResult = result_state["final"]
-            all_errors = list(final.errors)
+            all_notes = list(final.notes)
         else:
-            # Paused at await_review.  Read errors directly from the live state.
-            all_errors = list(result_state.get("errors", []))
+            # Paused at await_review.  Read notes directly from the live state.
+            all_notes = list(result_state.get("notes", []))
             assert "__interrupt__" in result_state, (
                 "Graph neither produced 'final' nor paused at interrupt — wiring bug"
             )
 
-        critic_errors = [e for e in all_errors if "critic suggested:" in e]
-        assert critic_errors, (
-            f"Expected at least one 'critic suggested:' entry in errors[], got: {all_errors}"
+        critic_notes = [n for n in all_notes if "Critic re-ran" in n]
+        assert critic_notes, (
+            f"Expected at least one 'Critic re-ran' entry in notes[], got: {all_notes}"
         )
 
         # Structural invariant: when reconcile DID run, reconciliations must

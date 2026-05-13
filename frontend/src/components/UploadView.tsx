@@ -83,17 +83,38 @@ export function UploadView({ onSubmit, busy }: Props) {
           or click to browse from disk. Up to 80 MB.
         </div>
         <div className="mono" style={{ fontSize: 11, color: "var(--ink-4)", marginTop: 10 }}>
-          Optional .txt OCR companion{ocr ? ` — selected: ${ocr.name}` : ""}
+          Scanned PDFs are OCR&apos;d server-side automatically.
+        </div>
+      </label>
+
+      <details
+        style={{
+          marginTop: 14,
+          fontSize: "var(--text-sm)",
+          color: "var(--ink-3)",
+        }}
+      >
+        <summary style={{ cursor: "pointer", userSelect: "none" }}>
+          Advanced: attach a pre-OCR&apos;d <span className="mono">.txt</span> companion
+        </summary>
+        <div style={{ marginTop: 10, paddingLeft: 4 }}>
+          <p style={{ margin: "0 0 8px 0", lineHeight: 1.5 }}>
+            Override server-side OCR with your own text (e.g. Azure DI output). Useful when
+            Tesseract&apos;s output is poor on noisy scans.
+          </p>
           <label
             htmlFor="ocr-input"
             style={{
-              marginLeft: 6,
+              display: "inline-block",
+              padding: "6px 10px",
+              border: "1px solid var(--accent-tint-2)",
+              borderRadius: 4,
               color: "var(--accent)",
-              borderBottom: "1px solid var(--accent-tint-2)",
               cursor: "pointer",
+              fontSize: 12,
             }}
           >
-            attach
+            {ocr ? `Selected: ${ocr.name}` : "Choose .txt file"}
           </label>
           <input
             id="ocr-input"
@@ -104,7 +125,7 @@ export function UploadView({ onSubmit, busy }: Props) {
             style={{ position: "absolute", width: 1, height: 1, opacity: 0, pointerEvents: "none" }}
           />
         </div>
-      </label>
+      </details>
 
       <div
         style={{ marginTop: 20, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}

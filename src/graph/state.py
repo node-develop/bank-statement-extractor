@@ -178,6 +178,10 @@ class GraphState(TypedDict):
     reconciliations: Annotated[list[Reconciliation], _reduce_by_chunk_id]
     retry_count: int
     errors: Annotated[list[str], operator.add]
+    # notes[]: informational pipeline notices (OCR engine used, critic
+    # iterations, etc.). Distinct from errors[] so the API can surface them
+    # to the user in a non-alarming UI block.
+    notes: Annotated[list[str], operator.add]
     pending_hint: NotRequired[Any]
     final: NotRequired[ExtractResult]
     # Phase 2 — verifier reports, one per chunk_id. ``_reduce_by_chunk_id`` so

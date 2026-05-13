@@ -122,7 +122,10 @@ type StreamEvent =
   | {
       kind: "step";
       step_id: string;
-      state: "running" | "done" | "error";
+      // "idle" is emitted by the backend to reset downstream lanes when the
+      // critic kicks off a retry (verifier/reconcile already completed for
+      // the previous iteration must go back to pending until they re-run).
+      state: "idle" | "running" | "done" | "error";
       progress: number;
       elapsed_ms: number;
       fanout?: number;

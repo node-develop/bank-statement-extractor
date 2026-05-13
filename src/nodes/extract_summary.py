@@ -39,6 +39,13 @@ _LLM_INSTANCE: Any = None
 
 # Balance summary block lives in the header; 6 000 chars covers it comfortably.
 _MAX_INPUT_CHARS = 6_000
+# Smart-slice: instead of naively taking the first N chars (which can mix
+# in the previous period's table recap on dense chunks where Azure DI lays
+# tables out densely), anchor on the "Beginning Balance" line of THIS chunk
+# and take up to _SMART_SLICE_LINES lines around it. Falls back to naive
+# truncation when no anchor is found.
+_SMART_SLICE_LINES = 120
+_SMART_SLICE_PRE = 5  # also include a few lines BEFORE the anchor (header)
 
 
 def _get_llm() -> Any:
@@ -72,14 +79,14 @@ def extract_summary(chunk: PeriodChunk) -> dict[str, Any]:
     """
     # Prefer pdf_text; fall back to ocr_slice when pdf_text is empty.
     raw_text: str = chunk.pdf_text if chunk.pdf_text else (chunk.ocr_slice or "")
+    text = _smart_slice_around_summary(raw_text)
     if len(raw_text) > _MAX_INPUT_CHARS:
         logger.warning(
-            "extract_summary: chunk %s text is %d chars, truncating to %d",
+            "extract_summary: chunk %s text is %d chars, smart-sliced to %d",
             chunk.chunk_id,
             len(raw_text),
-            _MAX_INPUT_CHARS,
+            len(text),
         )
-    text = raw_text[:_MAX_INPUT_CHARS]
 
     try:
         return _invoke_llm(chunk, text)
@@ -100,6 +107,40 @@ def extract_summary(chunk: PeriodChunk) -> dict[str, Any]:
         )
         logger.warning(error_msg)
         return {"summaries": [placeholder], "errors": [error_msg]}
+
+
+def _smart_slice_around_summary(raw_text: str) -> str:
+    """Slice the chunk text around the period's Beginning Balance anchor.
+
+    Why this beats naive ``raw_text[:N]``: on dense Azure DI layouts where
+    the previous period's table recap sometimes appears at the head of the
+    next chunk's slice, a head-cut grabs the WRONG period's data. The
+    Balance Summary block lives within a handful of lines of the anchor —
+    anchoring the slice on "Beginning Balance" guarantees we hand the LLM
+    THIS period's numbers, not the previous one's.
+
+    Falls back to ``raw_text[:_MAX_INPUT_CHARS]`` when no anchor is found.
+    """
+    if len(raw_text) <= _MAX_INPUT_CHARS:
+        return raw_text
+
+    lines = raw_text.split("\n")
+    anchor_idx: int | None = None
+    for i, line in enumerate(lines):
+        # Cheap substring check — full regex is in split_periods; here we
+        # just need to locate the line.
+        if "Beginning Balance" in line:
+            anchor_idx = i
+            break
+
+    if anchor_idx is None:
+        return raw_text[:_MAX_INPUT_CHARS]
+
+    start = max(0, anchor_idx - _SMART_SLICE_PRE)
+    end = min(len(lines), anchor_idx + _SMART_SLICE_LINES)
+    sliced = "\n".join(lines[start:end])
+    # Still respect the hard cap (very wide lines could overflow).
+    return sliced[:_MAX_INPUT_CHARS]
 
 
 def _invoke_llm(chunk: PeriodChunk, text: str) -> dict[str, Any]:

@@ -170,7 +170,7 @@ export function ResultsView({
             border: "1px solid var(--warning-border)",
             borderRadius: "var(--radius-3)",
             padding: "10px 14px",
-            marginBottom: 20,
+            marginBottom: 12,
             color: "var(--warning-fg)",
           }}
         >
@@ -179,6 +179,29 @@ export function ResultsView({
             {result.errors.map((e, i) => (
               // biome-ignore lint/suspicious/noArrayIndexKey: errors are positional pipeline notes with no stable id
               <li key={i}>{e}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {result.notes && result.notes.length > 0 && (
+        <div
+          style={{
+            background: "var(--surface-2)",
+            border: "1px solid var(--border-1)",
+            borderRadius: "var(--radius-3)",
+            padding: "10px 14px",
+            marginBottom: 20,
+            color: "var(--ink-2)",
+          }}
+        >
+          <strong style={{ fontWeight: 600, color: "var(--ink-1)" }}>
+            Pipeline notes ({result.notes.length}):
+          </strong>
+          <ul style={{ margin: "6px 0 0 0", paddingLeft: 20, fontSize: "var(--text-sm)" }}>
+            {result.notes.map((n, i) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: notes are positional pipeline messages with no stable id
+              <li key={i}>{n}</li>
             ))}
           </ul>
         </div>

@@ -169,7 +169,12 @@ def _make_state(
 
 class TestCriticNode:
     def test_critic_emits_hint_on_failure(self) -> None:
-        """When verifier_reports has suspects, critic emits a hint in errors[]."""
+        """When verifier_reports has suspects, critic emits a hint in notes[].
+
+        The hint is informational (which extractor to retry + why), not an
+        error. It belongs in notes[] so the frontend can show it in a
+        non-alarming info block alongside other pipeline notices.
+        """
         hint = _make_hint()
         state = _make_state(
             verifier_reports=[_make_verifier_report("period_01", n_suspects=2)],
@@ -181,11 +186,12 @@ class TestCriticNode:
             result = critic(state)
 
         assert result["retry_count"] == 1
-        assert len(result["errors"]) == 1
-        error_str = result["errors"][0]
-        assert "critic suggested:" in error_str
-        assert "extract_transactions" in error_str
-        assert "period_01" in error_str
+        assert "errors" not in result, "Critic success path must not write to errors[]"
+        assert len(result["notes"]) == 1
+        note_str = result["notes"][0]
+        assert "Critic re-ran" in note_str
+        assert "extract_transactions" in note_str
+        assert "period_01" in note_str
         assert "pending_hint" in result
         assert isinstance(result["pending_hint"], CriticHint)
         assert result["pending_hint"].extractor == "extract_transactions"

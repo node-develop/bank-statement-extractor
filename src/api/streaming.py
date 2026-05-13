@@ -224,6 +224,26 @@ async def stream_graph_events(
                     }
                     if node == "finalize":
                         final_result = _final_from_event(ev) or final_result
+                    # When the critic dispatches a retry, the downstream
+                    # KNOWN_STEPS that already completed (verifier, reconcile)
+                    # are about to run again. Without this reset, the UI keeps
+                    # showing them as "done" from the previous iteration while
+                    # the retry's extract_* is still running — leaving the
+                    # user with a paradoxical "verifier done, transactions
+                    # still running" timeline. Emit idle events so the
+                    # downstream lanes go back to pending; they'll re-emit
+                    # "running" naturally on their next on_chain_start.
+                    if node == "apply_critic_hint":
+                        for downstream in ("verifier", "reconcile"):
+                            step_emitted_running.discard(downstream)
+                            step_started_at.pop(downstream, None)
+                            yield {
+                                "kind": "step",
+                                "step_id": downstream,
+                                "state": "idle",
+                                "progress": 0.0,
+                                "elapsed_ms": 0,
+                            }
             elif kind == "on_chat_model_end":
                 model, usage = _model_and_usage(ev)
                 if usage:
@@ -245,27 +265,88 @@ async def stream_graph_events(
         yield {"kind": "done"}
         raise
 
-    # If the graph completed without producing a `final` ExtractResult
-    # (typically split_periods returned 0 chunks → fan-out dispatched 0
-    # Send objects → finalize never ran), surface a specific error event
-    # so the frontend's catch sees it and doesn't render a blank page on
-    # the implicit `setResult(null)`.
-    if final_result is None:
-        # Dedupe while preserving order — reducer-collected errors[] often
-        # propagate the same string across multiple node deltas.
-        dedup = list(dict.fromkeys(collected_errors))
-        if dedup:
-            # Specific pipeline errors are more actionable than a generic
-            # "graph terminated" message; show only those.
-            msg = "; ".join(dedup)
-        else:
-            msg = (
-                "Graph completed without a final ExtractResult. "
-                "Most likely cause: no period chunks detected."
-            )
-        yield {"kind": "error", "message": msg}
+    if final_result is not None:
+        yield {"kind": "result", "result": _serialize_final(final_result)}
         yield {"kind": "done"}
         return
 
-    yield {"kind": "result", "result": _serialize_final(final_result)}
+    # `final` never arrived. Two valid sub-cases:
+    #   (1) The graph paused at await_review (HITL) — `aget_state` returns a
+    #       StateSnapshot whose `.interrupts` tuple is non-empty. NOTE: this
+    #       diverges from `await graph.ainvoke(...)` which surfaces an
+    #       `__interrupt__` key inside the returned state dict (see
+    #       extract.py:237). The StateSnapshot exposes `.values` (state dict
+    #       WITHOUT `__interrupt__`) and `.interrupts` (the tuple) as
+    #       separate attributes. Mirror the sync endpoint's behaviour by
+    #       reading from those two surfaces.
+    #   (2) Genuine failure — split_periods produced 0 chunks, the fan-out
+    #       dispatched 0 Send objects, finalize never ran. Surface a
+    #       specific error so the frontend's catch sees it.
+    snapshot = await graph.aget_state(config)
+    state_values: dict[str, Any] = snapshot.values if hasattr(snapshot, "values") else {}
+    snapshot_interrupts: Any = getattr(snapshot, "interrupts", ()) or ()
+
+    if "final" not in state_values and snapshot_interrupts:
+        # Local imports avoid a circular dep at module load and match the
+        # pattern in extract.py.
+        from uuid import uuid4
+
+        from src.api import reviews as reviews_db
+        from src.api.routers.extract import _build_partial_periods_on_pause
+        from src.models import ExtractResult, PendingReview
+
+        # snapshot_interrupts is a tuple of Interrupt(value=..., id=...).
+        payload: dict[str, Any] = (
+            snapshot_interrupts[0].value
+            if snapshot_interrupts and hasattr(snapshot_interrupts[0], "value")
+            else {}
+        )
+        suspect_count = len(payload.get("suspects", []))
+        reason = payload.get("reason", "suspects_exceeded")
+        extraction_id = str(uuid4())
+
+        raw_obj = state_values.get("raw")
+        statement_sha256 = getattr(raw_obj, "sha256", "") if raw_obj is not None else ""
+        thread_id = (config.get("configurable") or {}).get("thread_id", "")
+
+        reviews_db.insert_pending(
+            extraction_id=extraction_id,
+            thread_id=thread_id,
+            statement_sha256=statement_sha256,
+            suspect_count=suspect_count,
+            reason=reason,
+            review_payload=payload,
+        )
+
+        raw_errors = state_values.get("errors", []) or []
+        errors_list: list[str] = list(raw_errors) if isinstance(raw_errors, list) else []
+        raw_notes = state_values.get("notes", []) or []
+        notes_list: list[str] = list(raw_notes) if isinstance(raw_notes, list) else []
+        partial_periods = _build_partial_periods_on_pause(state_values)
+
+        partial_result = ExtractResult(
+            periods=partial_periods,
+            statement_sha256=statement_sha256,
+            errors=errors_list,
+            notes=notes_list,
+            pending_review=PendingReview(
+                extraction_id=extraction_id,
+                reason=reason,
+                suspect_count=suspect_count,
+            ),
+        )
+        yield {"kind": "result", "result": _serialize_final(partial_result)}
+        yield {"kind": "done"}
+        return
+
+    # Genuine failure path.
+    dedup = list(dict.fromkeys(collected_errors))
+    if dedup:
+        msg = "; ".join(dedup)
+    else:
+        msg = (
+            "Graph completed without a final ExtractResult. "
+            "Most likely cause: no period chunks detected."
+        )
+    yield {"kind": "error", "message": msg}
     yield {"kind": "done"}

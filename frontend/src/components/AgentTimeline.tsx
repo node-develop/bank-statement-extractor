@@ -22,7 +22,9 @@ export function AgentTimeline({ steps, progress }: Props) {
           const t = p.elapsed_ms ? `${(p.elapsed_ms / 1000).toFixed(1)}s` : "—";
           return (
             <div key={s.id} className="lane">
-              <div className={`lane-name${p.state === "idle" ? " idle" : ""}`}>
+              <div
+                className={`lane-name${p.state === "idle" ? " idle" : p.state === "running" ? " running" : ""}`}
+              >
                 <span className="agent-dot" style={{ background: s.color }} />
                 {s.name}
                 {s.runs_per_period && p.fanout ? (
