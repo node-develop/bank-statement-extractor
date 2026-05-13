@@ -121,18 +121,12 @@ def _invoke_llm(chunk: PeriodChunk, text: str) -> dict[str, Any]:
     The prompt instructs the model to use the running-balance-delta rule from
     the first printed balance when the sentinel is present.
     """
-    from langchain_core.messages import SystemMessage
+    from langchain_core.messages import HumanMessage, SystemMessage
 
     prompt_body = load_prompt("extract_transactions", version=1)
 
     # The dynamic tail starts at the ``{chunk_id}`` / ``{beginning_balance}``
     # / ``{chunk_text}`` section.  Partition on the last section header.
-    # The prompt ends with:
-    #   ## Chunk to extract (chunk_id={chunk_id}, beginning_balance={beginning_balance})
-    #
-    #   {chunk_text}
-    #
-    # We split on the section header so the stable prefix ends just before it.
     dynamic_marker = "## Chunk to extract"
     stable_prefix, sep, _ = prompt_body.partition(dynamic_marker)
     if not sep:
@@ -144,6 +138,8 @@ def _invoke_llm(chunk: PeriodChunk, text: str) -> dict[str, Any]:
     # Build the dynamic block: inject chunk_id, beginning_balance, then text.
     dynamic_text = f"chunk_id={chunk.chunk_id}\nbeginning_balance=unknown\n\n{text}"
 
+    # Stable prefix → SystemMessage (cached). Dynamic chunk → HumanMessage
+    # (Anthropic requires ≥1 user message in messages[]).
     system = SystemMessage(
         content=[
             {
@@ -151,15 +147,12 @@ def _invoke_llm(chunk: PeriodChunk, text: str) -> dict[str, Any]:
                 "text": stable_prefix,
                 "cache_control": {"type": "ephemeral"},
             },
-            {
-                "type": "text",
-                "text": dynamic_text,
-            },
         ]
     )
+    user = HumanMessage(content=dynamic_text)
 
     llm_with_output = _get_llm().with_structured_output(_TransactionList)
-    raw_result: _TransactionList = llm_with_output.invoke([system])
+    raw_result: _TransactionList = llm_with_output.invoke([system, user])
 
     # Always overwrite chunk_id on every transaction from the input chunk.
     tx_list = [

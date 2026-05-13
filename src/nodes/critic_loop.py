@@ -201,7 +201,7 @@ def _invoke_critic_llm(
       ``## Reconciliation failure`` section in critic.md.
     - Block 2 (dynamic, no cache): the serialised failure context.
     """
-    from langchain_core.messages import SystemMessage
+    from langchain_core.messages import HumanMessage, SystemMessage
 
     prompt_body = load_prompt("critic", version=1)
 
@@ -231,6 +231,8 @@ def _invoke_critic_llm(
         f"{notes_joined}"
     )
 
+    # Stable prefix → SystemMessage (cached).  Dynamic block → HumanMessage
+    # (Anthropic requires ≥1 user message in messages[]).
     system = SystemMessage(
         content=[
             {
@@ -238,15 +240,12 @@ def _invoke_critic_llm(
                 "text": stable_prefix,
                 "cache_control": {"type": "ephemeral"},
             },
-            {
-                "type": "text",
-                "text": dynamic_block,
-            },
         ]
     )
+    user = HumanMessage(content=dynamic_block)
 
     llm_with_output = _get_llm().with_structured_output(CriticHint)
-    result: CriticHint = llm_with_output.invoke([system])
+    result: CriticHint = llm_with_output.invoke([system, user])
 
     # Ensure chunk_id is propagated from the failure context, not the LLM echo.
     return CriticHint(

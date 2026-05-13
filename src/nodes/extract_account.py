@@ -107,7 +107,7 @@ def _invoke_llm(chunk: PeriodChunk, text: str) -> dict[str, Any]:
     is cached and reused across the 10-period fan-out.  The dynamic chunk text
     goes in a second content block WITHOUT cache_control.
     """
-    from langchain_core.messages import SystemMessage
+    from langchain_core.messages import HumanMessage, SystemMessage
 
     prompt_body = load_prompt("extract_account", version=1)
     stable_prefix, sep, _ = prompt_body.partition("{chunk_text}")
@@ -115,6 +115,9 @@ def _invoke_llm(chunk: PeriodChunk, text: str) -> dict[str, Any]:
         # Prompt file is malformed: missing placeholder. Use whole body as prefix.
         stable_prefix = prompt_body
 
+    # Stable prefix → SystemMessage (cached).  Dynamic chunk → HumanMessage.
+    # Anthropic requires ≥1 user message in the messages[] array; a
+    # SystemMessage-only call returns 400 "messages: at least one message is required".
     system = SystemMessage(
         content=[
             {
@@ -122,15 +125,12 @@ def _invoke_llm(chunk: PeriodChunk, text: str) -> dict[str, Any]:
                 "text": stable_prefix,
                 "cache_control": {"type": "ephemeral"},
             },
-            {
-                "type": "text",
-                "text": text,
-            },
         ]
     )
+    user = HumanMessage(content=text)
 
     llm_with_output = _get_llm().with_structured_output(Account)
-    raw_result: Account = llm_with_output.invoke([system])
+    raw_result: Account = llm_with_output.invoke([system, user])
 
     # Always overwrite chunk_id from the input chunk — LLM may echo exemplar id.
     account = Account(

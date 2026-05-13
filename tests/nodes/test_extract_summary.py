@@ -140,23 +140,20 @@ def test_extract_summary_cache_discipline() -> None:
     with patch("src.nodes.extract_summary._get_llm", return_value=llm):
         extract_summary(chunk)
 
-    assert len(captured_messages) == 1
-    content = captured_messages[0].content
-    assert isinstance(content, list), "system message must use the multi-block content form"
-    assert len(content) == 2, f"expected 2 blocks (stable + dynamic), got {len(content)}"
-
-    stable, dynamic = content
-    assert stable.get("cache_control") == {"type": "ephemeral"}, (
-        "stable prefix must have cache_control ephemeral"
+    # Two messages: SystemMessage (cached prefix) + HumanMessage (dynamic).
+    assert len(captured_messages) == 2, (
+        f"expected 2 messages (system + human), got {len(captured_messages)}"
     )
-    assert "cache_control" not in dynamic, (
-        "dynamic block must NOT have cache_control (would poison cache key)"
-    )
-    assert "DYNAMIC_CHUNK_TEXT_SUMMARY" in dynamic["text"], (
-        f"dynamic block must carry the chunk text verbatim, got {dynamic['text']!r}"
-    )
+    system_msg, user_msg = captured_messages
+    assert isinstance(system_msg.content, list)
+    assert len(system_msg.content) == 1
+    stable = system_msg.content[0]
+    assert stable.get("cache_control") == {"type": "ephemeral"}
     assert "DYNAMIC_CHUNK_TEXT_SUMMARY" not in stable["text"], (
         "stable prefix must NOT contain the dynamic chunk text"
+    )
+    assert "DYNAMIC_CHUNK_TEXT_SUMMARY" in user_msg.content, (
+        f"HumanMessage must carry the chunk text verbatim, got {user_msg.content!r}"
     )
 
 
@@ -173,10 +170,11 @@ def test_extract_summary_truncates_large_text() -> None:
     received_texts: list[str] = []
 
     def _capture_invoke(messages: list[Any]) -> Summary:
-        content = messages[0].content
-        for block in content:
-            if isinstance(block, dict) and "text" in block and "cache_control" not in block:
-                received_texts.append(block["text"])
+        # Dynamic chunk text now lives on the HumanMessage; SystemMessage
+        # carries only the cached stable prefix.
+        for msg in messages:
+            if isinstance(msg.content, str):
+                received_texts.append(msg.content)
         return _make_summary(chunk_id="period_01")
 
     structured = MagicMock()
