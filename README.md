@@ -1,4 +1,4 @@
-# bank-statement-analizer
+# bank-statement-extractor
 
 HTTP service that turns a bank-statement PDF into structured
 `{account, summary, transactions}` JSON, one block per statement period.
@@ -89,16 +89,19 @@ pnpm dev                                            # http://localhost:5173
 Set `FRONTEND_ORIGIN=http://localhost:5173` in `.env` so CORS lets the
 Vite dev server talk to the API.
 
-### Eval on the bundled Ixonia sample
+### Eval runner
 
 ```bash
 uv run python -m src.evals.run \
-    --statement Task/Binder2_Redacted.pdf \
-    --txt Task/ixonia_binder2_ocr.txt
+    --statement path/to/statement.pdf \
+    --txt path/to/statement_ocr.txt \
+    --dataset path/to/etalon.jsonl
 ```
 
 The runner asserts exact-match on every summary field and transaction
-count across the 10 statement periods that ship in `Task/`.
+count for each statement period listed in the JSONL etalon. The original
+evaluation bundle is private and not shipped with the repository; eval
+tests skip when it is absent.
 
 ## HTTP API
 
@@ -133,8 +136,8 @@ binary-float drift.
 ### Example
 
 ```bash
-curl -F "file=@Task/Binder2_Redacted.pdf;type=application/pdf" \
-     -F "ocr_text=@Task/ixonia_binder2_ocr.txt;type=text/plain" \
+curl -F "file=@tests/fixtures/stmt_02_riverstone_bofa.pdf;type=application/pdf" \
+     -F "ocr_text=@tests/fixtures/stmt_02_riverstone_bofa.ocr.txt;type=text/plain" \
      http://localhost:8000/extract | jq '.periods[0].summary'
 ```
 
@@ -248,20 +251,11 @@ through `POST /review/{extraction_id}`.
 
 ## Sample data
 
-The repository ships:
-
-- `Task/Binder2_Redacted.pdf` — a 99-page image-based statement bundle
-  that exercises the OCR fallback. Cold-start OCR on this file takes
-  roughly five minutes with the bundled Tesseract engine; subsequent
-  requests reuse the result via the LangGraph checkpointer. Pass the
-  pre-extracted OCR text via `ocr_text` to skip OCR entirely.
-- `Task/ixonia_binder2_ocr.txt` — the pre-extracted OCR text for the
-  bundle, used by the bundled eval.
-- `Task/task.md` — the original brief.
-
-The bundle contains 10 statement periods; the etalon totals and
-transaction counts in `Task/` are reproduced exactly by the extraction
-pipeline.
+`tests/fixtures/` ships five synthetic US business bank statements
+(all companies, account numbers and transactions are invented), ranging
+from clean vector PDFs to rotated, noisy 110 DPI scans that exercise the
+OCR fallback. Each PDF comes with a ground-truth JSON and a raw Tesseract
+transcript; see `tests/fixtures/README.md`.
 
 ## Development
 
@@ -326,7 +320,6 @@ frontend/           Vite + React 19 + TypeScript SPA (Biome formatter).
 infra/              Dockerfile (api), Dockerfile.frontend, docker-compose.yml,
                     dokploy.json, nginx.conf.
 tests/              pytest suite mirroring src/ layout.
-Task/               Bundled sample PDF, OCR text, and original brief.
 ```
 
 ## License

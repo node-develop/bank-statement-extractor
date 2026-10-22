@@ -3,15 +3,17 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    import pytest
+import pytest
 
-# The dataset already lives in the repo; tests reuse it.
+# The private eval dataset is kept out of the repo; tests skip without it.
 _REPO = Path(__file__).resolve().parent.parent.parent
 _DATASET = _REPO / "src" / "evals" / "datasets" / "ixonia.jsonl"
 _STATEMENT = "Task/Binder2_Redacted.pdf"
+
+pytestmark = pytest.mark.skipif(
+    not _DATASET.exists(), reason="private eval dataset not present in this environment"
+)
 
 
 def test_main_dry_run_returns_zero_and_writes_report(tmp_path: Path) -> None:

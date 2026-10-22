@@ -11,10 +11,13 @@ _DATASET = (
     Path(__file__).resolve().parent.parent.parent / "src" / "evals" / "datasets" / "ixonia.jsonl"
 )
 
+pytestmark = pytest.mark.skipif(
+    not _DATASET.exists(), reason="private eval dataset not present in this environment"
+)
+
 
 @pytest.fixture
 def entries() -> list[dict]:
-    assert _DATASET.exists(), f"missing dataset: {_DATASET}"
     out: list[dict] = []
     with _DATASET.open(encoding="utf-8") as f:
         for line in f:
